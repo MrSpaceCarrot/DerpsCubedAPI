@@ -16,8 +16,3 @@ app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 
 # Setup routers
 app.include_router(servers.router)
-
-# Root
-@app.get("/")
-def root():
-    return {"Hello": "World"}
