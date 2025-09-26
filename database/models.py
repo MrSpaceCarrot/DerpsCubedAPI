@@ -1,10 +1,8 @@
 # Module Imports
-from typing import Annotated
 from urllib.parse import quote_plus
-from fastapi import Depends
 from sqlmodel import SQLModel, Field, create_engine, Relationship
 from datetime import datetime
-from core.config import settings
+from config import settings
 
 # Database connection
 DATABASE_URL = f"mysql+mysqlconnector://{settings.DB_USERNAME}:{quote_plus(settings.DB_PASSWORD)}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_DATABASE}"
