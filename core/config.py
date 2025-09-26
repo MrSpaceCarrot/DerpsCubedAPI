@@ -4,7 +4,9 @@ from pydantic import Field
 
 class Settings(BaseSettings):
     # General settings
-    APP_NAME: str = "Derpscubed API"
+    APP_TITLE: str
+    APP_SUMMARY: str
+    APP_VERSION: str
 
     # Database settings
     DB_HOST: str
