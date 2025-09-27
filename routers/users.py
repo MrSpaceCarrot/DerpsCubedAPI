@@ -9,7 +9,7 @@ router = APIRouter()
 # Get all users
 @router.get("/", tags=["users"])
 def get_users(session: Session = Depends(get_session)) -> list[User]:
-    users = session.exec(select(User)).all()
+    users = session.exec(select(User).order_by(User.id.asc())).all()
     return [user.order() for user in users]
     
 # Get specific user

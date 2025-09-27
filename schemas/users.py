@@ -5,7 +5,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
-    from schemas.games import Game
+    from schemas.games import Game, GameRating
 
 
 # Schemas
@@ -23,7 +23,8 @@ class User(SQLModel, table=True):
     can_add_games: Optional[bool] = Field(index=True, default=None)
 
     api_keys: Optional[list["ApiKey"]] = Relationship(back_populates="user")
-    games_added: List["Game"] = Relationship(back_populates="added_by")
+    games_added: Optional[List["Game"]] = Relationship(back_populates="added_by")
+    ratings: Optional[list["GameRating"]] = Relationship(back_populates="user")
 
     def order(self):
         return {

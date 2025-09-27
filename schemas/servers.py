@@ -25,10 +25,22 @@ class Server(SQLModel, table=True):
 
     def order(self):
         return {
-            "id": self.id, "name": self.name, "description": self.description, "category": self.category, "version": self.version, 
-            "modloader": self.modloader, "moddownload": self.moddownload, "active": self.is_active, "compatible": self.is_compatible,
-            "modconditions": self.modconditions, "icon": self.icon, "color": self.color, "port": self.port, "emoji": self.emoji,
-            "uuid": self.uuid, "domain": self.domain
+            "id": self.id, 
+            "name": self.name, 
+            "description": self.description, 
+            "category": self.category, 
+            "version": self.version, 
+            "modloader": self.modloader, 
+            "moddownload": self.moddownload, 
+            "active": self.is_active, 
+            "compatible": self.is_compatible,
+            "modconditions": self.modconditions, 
+            "icon": self.icon, 
+            "color": self.color, 
+            "port": self.port, 
+            "emoji": self.emoji,
+            "uuid": self.uuid, 
+            "domain": self.domain
         }
 
 
@@ -41,4 +53,10 @@ class ServerCategory(SQLModel, table=True):
     is_minecraft: Optional[bool] = Field(index=True, default=None)
 
     def order(self):
-        return {"id": self.id, "name": self.name, "icon": self.icon, "color": self.color, "is_minecraft": self.is_minecraft}
+        return {
+            "id": self.id, 
+            "name": self.name, 
+            "icon": self.icon, 
+            "color": self.color, 
+            "is_minecraft": self.is_minecraft
+        }

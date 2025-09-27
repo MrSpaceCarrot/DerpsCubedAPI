@@ -3,7 +3,7 @@ from urllib.parse import quote_plus
 from config import settings
 from sqlmodel import SQLModel, create_engine, Session
 from schemas.auth import ApiKey
-from schemas.games import Game
+from schemas.games import Game, GameTag ,GameRating
 from schemas.servers import Server, ServerCategory
 from schemas.users import User
 
