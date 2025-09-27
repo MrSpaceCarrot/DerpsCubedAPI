@@ -1,12 +1,13 @@
 # Module Imports
 import logging
 from datetime import datetime
-from fastapi import APIRouter, Request, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
-from database.models import engine, User
 from config import settings
 from auth.utilities import *
+from schemas.database import get_session
+from schemas.users import User
 
 
 router = APIRouter()
@@ -19,7 +20,7 @@ def login_discord() -> RedirectResponse:
 
 # Authenticate user once they login with discord
 @router.get("/discord/callback", tags=["auth"])
-def discord_callback(code: str | None = None):
+def discord_callback(code: str | None = None, session: Session = Depends(get_session)):
     # Ensure access code is present
     if not code:
         raise HTTPException(
@@ -34,35 +35,39 @@ def discord_callback(code: str | None = None):
     user_info = get_discord_user_info(access_token)
 
     # Get user from database
-    with Session(engine) as session:
-        user: User = session.exec(select(User).where(User.discord_id == user_info["id"])).first()
+    user: User = session.exec(select(User).where(User.discord_id == user_info["id"])).first()
 
-        # Create user if they do not already exist
-        if not user:
-            user = User(discord_id=user_info["id"])
-            user.display_name = user_info["username"]
-            user.can_use_site = False
-            user.can_add_games = False
+    # Create user if they do not already exist
+    first_site_use = False
+    if not user:
+        user = User(discord_id=user_info["id"])
+        first_site_use = True
 
-        # If user exists but is only logging onto site for first time, set first login
-        if user.first_site_login == None:
-            user.first_site_login = datetime.now()
+    # Check if user exists but is doing first login
+    if user.first_site_login == None:
+        first_site_use = True
 
-            # Check if user is in whitelisted discord servers
-            # TO DO
+    # Setup user if using site for first time
+    if first_site_use:
+        user.first_site_login = datetime.now()
+        user.display_name = user_info["username"]
+        user.can_use_site = False
+        user.can_add_games = False
 
-        # Update some fields every time a user logs in
-        user.username = user_info["username"]
-        user.avatar_link = f"https://cdn.discordapp.com/avatars/{user_info['id']}/{user_info['avatar']}?size=1024"
-        user.last_site_login = datetime.now()
-
-        # Save user to database
-        session.add(user)
-        session.commit()
-
-        # Issue token
+        # Check if user is in whitelisted discord servers
         # TO DO
 
-        # Return token
-        # TO DO
-        
+    # Update some fields every time a user logs in
+    user.username = user_info["username"]
+    user.avatar_link = f"https://cdn.discordapp.com/avatars/{user_info['id']}/{user_info['avatar']}?size=1024"
+    user.last_site_login = datetime.now()
+
+    # Save user to database
+    session.add(user)
+    session.commit()
+
+    # Issue token
+    # TO DO
+
+    # Return token
+    # TO DO

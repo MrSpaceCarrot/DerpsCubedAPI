@@ -1,8 +1,9 @@
 # Module Imports
 from fastapi import Security, HTTPException, status
 from fastapi.security import APIKeyHeader
-from database.models import engine, ApiKey
 from sqlmodel import Session, select
+from schemas.database import engine
+from schemas.auth import ApiKey
 
 api_key_header = APIKeyHeader(name="X-API-Key")
 

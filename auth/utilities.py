@@ -1,6 +1,6 @@
 # Module Imports
 import requests
-from fastapi import Security, HTTPException, status
+from fastapi import HTTPException, status
 from config import settings
 
 # Get Discord access token from access code

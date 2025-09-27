@@ -6,7 +6,7 @@ from sqlalchemy import pool
 from alembic import context
 from config import settings
 
-from database.models import *
+from schemas.database import *
 
 # Setup URL
 DATABASE_URL = f'mysql+mysqlconnector://{settings.DB_USERNAME}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_DATABASE}'

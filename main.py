@@ -3,19 +3,19 @@ import logging
 import uvicorn
 from fastapi import FastAPI, Depends
 from contextlib import asynccontextmanager
-from database import models
 from routers import auth, servers, users
-from config import settings, log_config
 from auth.security import get_api_key
+from config import settings, log_config
+from schemas.database import setup_database
+
+# Tags metadata
+tags_metadata = [{"name": "Auth"}, {"name": "Servers"}, {"name": "Users"}]
 
 # Startup logic
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    models.setup_database()
+    setup_database()
     yield
-
-# Tags metadata
-tags_metadata = [{"name": "Auth"}, {"name": "Servers"}, {"name": "Users"}]
 
 # Create app
 app = FastAPI(title=settings.APP_TITLE, 
