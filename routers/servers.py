@@ -1,7 +1,7 @@
 # Module Imports
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
-from schemas.database import get_session, engine
+from schemas.database import get_session
 from schemas.servers import Server, ServerCategory
 
 

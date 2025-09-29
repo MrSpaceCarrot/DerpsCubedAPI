@@ -12,5 +12,13 @@ class ApiKey(SQLModel, table=True):
     id: int = Field(primary_key=True, index=True)
     key: str = Field(index=True, default=None, max_length=255, unique=True)
 
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
-    user: Optional["User"] = Relationship(back_populates="api_keys")
+    user_id: int = Field(foreign_key="users.id")
+    user: "User" = Relationship(back_populates="api_keys")
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
+
+class TokenPublic(SQLModel):
+    username: Optional[str] = None

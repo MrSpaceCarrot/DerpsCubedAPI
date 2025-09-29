@@ -5,8 +5,10 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 from config import settings
+from auth.security import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from auth.utilities import *
 from schemas.database import get_session
+from schemas.auth import Token
 from schemas.users import User
 
 
@@ -66,8 +68,7 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
     session.add(user)
     session.commit()
 
-    # Issue token
-    # TO DO
-
-    # Return token
-    # TO DO
+    # Issue and return token
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    return Token(access_token=access_token, token_type="bearer")

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     DISCORD_ACCESS_TOKEN_URL: str
     DISCORD_USERINFO_URL: str
 
+    # JWT Settings
+    JWT_SECRET_KEY: str
+    JWT_ACCESS_TOKEN_EXPIRY_MINS: int
+
     # Specify env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -74,6 +78,11 @@ log_config = {
             'propagate': False,
         },
         'uvicorn': {
+            'handlers': ['console', 'logfile'],
+            'level': settings.LOG_LEVEL_UVICORN,
+            'propagate': False,
+        },
+        'uvicorn.error': {
             'handlers': ['console', 'logfile'],
             'level': settings.LOG_LEVEL_UVICORN,
             'propagate': False,

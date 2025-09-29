@@ -1,7 +1,11 @@
 # Module Imports
 import requests
+import jwt
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from config import settings
+from auth.security import SECRET_KEY, ALGORITHM
+
 
 # Get Discord access token from access code
 def get_discord_access_token(access_code: str):
@@ -35,3 +39,11 @@ def get_discord_user_info(access_token: str):
             detail="Error getting user information"
         )
     return response.json()
+
+# Create JWT access token
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + expires_delta
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt

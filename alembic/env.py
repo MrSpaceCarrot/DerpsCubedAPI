@@ -7,6 +7,10 @@ from alembic import context
 from config import settings
 
 from schemas.database import *
+from schemas.auth import ApiKey
+from schemas.games import Game, GameTag, GameRating
+from schemas.servers import Server, ServerCategory
+from schemas.users import User
 
 # Setup URL
 DATABASE_URL = f'mysql+mysqlconnector://{settings.DB_USERNAME}:{settings.DB_PASSWORD}@{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_DATABASE}'

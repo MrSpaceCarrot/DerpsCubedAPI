@@ -25,9 +25,9 @@ app = FastAPI(title=settings.APP_TITLE,
 
 # Setup routers
 app.include_router(auth.router, prefix="/api/auth")
-app.include_router(games.router, prefix="/api/games", dependencies=[Depends(get_api_key)])
+app.include_router(games.router, prefix="/api/games")
 app.include_router(servers.router, prefix="/api/servers", dependencies=[Depends(get_api_key)])
-app.include_router(users.router, prefix="/api/users", dependencies=[Depends(get_api_key)])
+app.include_router(users.router, prefix="/api/users")
 
 # Run app
 if __name__ == "__main__":
