@@ -32,7 +32,9 @@ class Settings(BaseSettings):
 
     # JWT Settings
     JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRY_MINS: int
+    JWT_REFRESH_TOKEN_EXPIRY_MINS: int
 
     # Specify env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

@@ -1,14 +1,14 @@
 # Module Imports
 import logging
+from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Request, Cookie, Depends, Header
 from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 from config import settings
-from auth.security import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from auth.utilities import *
 from schemas.database import get_session
-from schemas.auth import Token
+from schemas.auth import Tokens, RefreshToken
 from schemas.users import User
 
 
@@ -51,7 +51,7 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
 
     # Setup user if using site for first time
     if first_site_use:
-        user.first_site_login = datetime.now()
+        user.first_site_login = datetime.now(timezone.utc)
         user.display_name = user_info["username"]
         user.can_use_site = False
         user.can_add_games = False
@@ -62,13 +62,49 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
     # Update some fields every time a user logs in
     user.username = user_info["username"]
     user.avatar_link = f"https://cdn.discordapp.com/avatars/{user_info['id']}/{user_info['avatar']}?size=1024"
-    user.last_site_login = datetime.now()
-
-    # Save user to database
+    user.last_site_login = datetime.now(timezone.utc)
     session.add(user)
-    session.commit()
 
-    # Issue and return token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
-    return Token(access_token=access_token, token_type="bearer")
+    # Issue access and refresh token, save refresh token to database
+    issued_at = datetime.now(timezone.utc)
+    access_token = create_jwt_token(username=user.username, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+    refresh_token = create_jwt_token(username=user.username, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
+    db_refresh_token = RefreshToken(subject=user.username, issued_at=issued_at, expires_at=issued_at + timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
+    session.add(db_refresh_token)
+
+    # Return tokens
+    session.commit()
+    return Tokens(access_token=access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token)
+
+# Issue a new access token using a refresh token
+@router.post("/token/refresh", tags=["auth"], response_model=Tokens)
+def refresh_access_token(authorization: Optional[str] = Header(None, convert_underscores=False),
+                         refresh_cookie: Optional[str] = Cookie(default=None, alias="refresh_token"), 
+                         session: Session = Depends(get_session)):
+    # Ensure request has a refresh token, check either cookie or auth header
+    logger.critical(authorization)
+    if refresh_cookie:
+        refresh_token = refresh_cookie
+    elif authorization:
+        refresh_token = authorization.split(" ")[1]
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+
+    # Decode token
+    payload = decode_jwt_token(refresh_token)
+    username = payload.get("sub")
+    issued_at = datetime.fromtimestamp(payload.get("iat"), tz=timezone.utc)
+    expires_at = datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc)
+
+    # Search for token in database
+    db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == username, 
+                                                               RefreshToken.issued_at == issued_at,
+                                                               RefreshToken.expires_at == expires_at)).first()
+    
+    # Give error if no token was found
+    if not db_refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    # Generate and return new token
+    new_access_token = create_jwt_token(username=payload.get("sub"), issued_at=datetime.now(timezone.utc), expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+    return Tokens(access_token=new_access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token)

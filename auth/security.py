@@ -7,14 +7,10 @@ from fastapi import HTTPException, status, Depends, Security
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from config import settings
+from auth.utilities import decode_jwt_token
 from schemas.database import engine
 from schemas.auth import ApiKey
 from schemas.users import User
-
-# JWT Settings
-SECRET_KEY = settings.JWT_SECRET_KEY
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.JWT_ACCESS_TOKEN_EXPIRY_MINS
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 logger = logging.getLogger("services")
@@ -34,7 +30,7 @@ class Authenticator:
         # Validate JWT Token
         if self.jwt_token_allowed and jwt_token:
             try:
-                payload = jwt.decode(jwt=jwt_token.credentials, key=SECRET_KEY, algorithms=[ALGORITHM])
+                payload = decode_jwt_token(jwt_token.credentials)
                 username = payload.get("sub")
                 with Session(engine) as session:
                     db_user: User = session.exec(select(User).where(User.username == username)).first()

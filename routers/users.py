@@ -1,5 +1,5 @@
 # Module Imports
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from auth.security import Authenticator, get_current_user
@@ -38,7 +38,7 @@ def update_current_user_info(user: UserUpdate, current_user: User =  Depends(get
 
     # Update display name last changed
     if user.display_name != current_user.display_name:
-        current_user.display_name_last_changed = datetime.now()
+        current_user.display_name_last_changed = datetime.now(timezone.utc)
 
     # Write updates to db model
     for key, value in user_updates.items():

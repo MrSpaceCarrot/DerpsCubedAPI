@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 class User(SQLModel, table=True):
     __tablename__ = "users"
     id: int = Field(primary_key=True, index=True)
-    discord_id: int = Field(index=True, default=None, max_length=100)
+    discord_id: str = Field(index=True, default=None, max_length=100)
     username: Optional[str] = Field(index=True, default=None, max_length=100)
     avatar_link: Optional[str] = Field(index=True, default=None, max_length=100)
     first_site_login: Optional[datetime] = Field(index=True, default=None)
@@ -30,7 +30,7 @@ class User(SQLModel, table=True):
 
 class UserPublic(SQLModel):
     id: int
-    discord_id: int
+    discord_id: str
     username: Optional[str]
     avatar_link: Optional[str]
     first_site_login: Optional[datetime]
@@ -42,7 +42,7 @@ class UserPublic(SQLModel):
 
 
 class UserCreate(SQLModel):
-    discord_id: int
+    discord_id: str
 
 class UserUpdate(SQLModel):
     display_name: Optional[str]

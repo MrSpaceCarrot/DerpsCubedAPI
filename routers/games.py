@@ -1,5 +1,6 @@
 # Module Imports
 import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from sqlalchemy import func
@@ -67,7 +68,7 @@ def update_game_rating(rating: GameRatingUpdate, current_user: User =  Depends(g
         db_rating.user_id = current_user.id
 
     # Update last_updated
-    db_rating.last_updated = datetime.now()
+    db_rating.last_updated = datetime.now(timezone.utc)
 
     # Commit rating and return
     session.add(db_rating)
@@ -97,7 +98,7 @@ def add_game(game: GameCreate, current_user: User =  Depends(get_current_user_ca
     db_game.last_updated = get_last_updated(db_game.link, db_game.platform)
 
     # Set date added
-    db_game.date_added = datetime.now()
+    db_game.date_added = datetime.now(timezone.utc)
 
     # Commit game to db and return
     session.add(db_game)
