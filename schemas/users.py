@@ -43,3 +43,6 @@ class UserPublic(SQLModel):
 
 class UserCreate(SQLModel):
     discord_id: int
+
+class UserUpdate(SQLModel):
+    display_name: Optional[str]

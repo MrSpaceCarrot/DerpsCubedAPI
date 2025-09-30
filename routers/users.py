@@ -1,9 +1,10 @@
 # Module Imports
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from auth.security import Authenticator, get_current_user
 from schemas.database import get_session
-from schemas.users import User, UserPublic, UserCreate
+from schemas.users import User, UserPublic, UserCreate, UserUpdate
 
 router = APIRouter()
 
@@ -27,6 +28,26 @@ def create_user(user: UserCreate, session: Session = Depends(get_session)):
 # Get current user
 @router.get("/me", tags=["users"], response_model=UserPublic)
 def get_current_user_info(current_user: User =  Depends(get_current_user)):
+    return current_user
+
+# Update current user
+@router.patch("/me", tags=["users"], response_model=UserPublic)
+def update_current_user_info(user: UserUpdate, current_user: User =  Depends(get_current_user), session: Session = Depends(get_session)):
+    # Get updates provided by user
+    user_updates = user.model_dump(exclude_unset=True)
+
+    # Update display name last changed
+    if user.display_name != current_user.display_name:
+        current_user.display_name_last_changed = datetime.now()
+
+    # Write updates to db model
+    for key, value in user_updates.items():
+        setattr(current_user, key, value)
+
+    # Commit user to db and return
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
     return current_user
     
 # Get specific user
