@@ -1,6 +1,7 @@
 # Module Imports
 from fastapi import APIRouter, HTTPException, Depends
 from sqlmodel import Session, select
+from auth.security import Authenticator
 from schemas.database import get_session
 from schemas.servers import Server, ServerCategory
 
@@ -8,19 +9,19 @@ from schemas.servers import Server, ServerCategory
 router = APIRouter()
 
 # Get all servers
-@router.get("/", tags=["servers"])
+@router.get("/", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
 def get_servers(session: Session = Depends(get_session)) -> list[Server]:
     servers = session.exec(select(Server).order_by(Server.id.asc())).all()
     return [server.order() for server in servers]
     
 # Get all server categories
-@router.get("/categories/", tags=["servers"])
+@router.get("/categories/", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
 def get_server_categories(session: Session = Depends(get_session)) -> list[ServerCategory]:
     categories = session.exec(select(ServerCategory).order_by(ServerCategory.id.asc())).all()
     return [category.order() for category in categories]
     
 # Get specific server category
-@router.get("/categories/{id}", tags=["servers"])
+@router.get("/categories/{id}", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
 def get_server_category(id: int, session: Session = Depends(get_session)) -> ServerCategory:
     category = session.get(ServerCategory, id)
     if not category:
@@ -28,7 +29,7 @@ def get_server_category(id: int, session: Session = Depends(get_session)) -> Ser
     return category.order()
 
 # Get specific server
-@router.get("/{id}/", tags=["servers"])
+@router.get("/{id}/", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
 def get_server(id: int, session: Session = Depends(get_session)) -> Server:
     server = session.get(Server, id)
     if not server:

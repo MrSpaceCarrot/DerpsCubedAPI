@@ -16,6 +16,7 @@ logger = logging.getLogger("services")
 
 
 # Schemas
+# Game
 class GameBase(SQLModel):
     name: str = Field(..., index=True, max_length=100)
     platform: str = Field(..., index=True, max_length=6)
@@ -92,10 +93,16 @@ class Game(GameBase, table=True):
     ratings: Optional[list["GameRating"]] = Relationship(back_populates="game")
 
 
-class GamePublic(GameBase):
+class GamePublic(SQLModel):
     id: int
+    name: str
+    platform: str
     install_size: Optional[int]
+    link: str
     banner_link: Optional[str]
+    min_party_size: int
+    max_party_size: int
+    tags: List[str]
     last_updated: Optional[datetime]
     date_added: datetime
     added_by_id: Optional[int]
@@ -120,30 +127,42 @@ class GameUpdate(GameBase):
     update_banner_link: Optional[bool] = None
 
 
+# GameTag
 class GameTag(SQLModel, table=True):
     __tablename__ = "game_tags"
     id: int = Field(primary_key=True, index=True)
     name: str = Field(index=True, default=None, max_length=50)
 
 
+# GameRating
 class GameRating(SQLModel, table=True):
     __tablename__ = "game_ratings"
-    id: int = Field(primary_key=True, index=True)
+    id: Optional[int] = Field(primary_key=True, index=True, default=None)
 
-    game_id: int = Field(default=None, sa_column=sa.Column(sa.Integer, sa.ForeignKey("games.id", ondelete="CASCADE"), nullable=False))
+    game_id: int = Field(..., sa_column=sa.Column(sa.Integer, sa.ForeignKey("games.id", ondelete="CASCADE"), nullable=False))
     game: "Game" = Relationship(back_populates="ratings")
 
-    user_id: int = Field(default=None, sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False))
+    user_id: int = Field(..., sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False))
     user: "User" = Relationship(back_populates="ratings")
 
-    rating: int = Field(index=True, default=None)
-    date_added: datetime = Field(index=True, default=None)
+    rating: int = Field(..., index=True)
+    last_updated: datetime = Field(index=True, default=None)
 
-    def order(self):
-        return {
-            "id": self.id, 
-            "game": self.game,
-            "user": self.user,
-            "rating": self.rating,
-            "date_added": self.date_added
-        }
+
+class GameRatingPublic(SQLModel):
+    id: int
+    game_id: int
+    user_id: int
+    rating: int
+    last_updated: datetime
+
+
+class GameRatingUpdate(SQLModel):
+    game_id: int
+    rating: int
+
+    @field_validator("rating")
+    def validate_rating(cls, value: int) -> int:
+        if value and (value < -1 or value > 10):
+            raise ValueError("Rating must be between 1 and 10, 0 for unrated, -1 for ignored")
+        return value

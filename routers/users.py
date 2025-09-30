@@ -1,28 +1,38 @@
 # Module Imports
-from typing import Annotated
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
-from auth.security import get_current_user
+from auth.security import Authenticator, get_current_user
 from schemas.database import get_session
-from schemas.users import User
+from schemas.users import User, UserPublic, UserCreate
 
 router = APIRouter()
 
 # Get all users
-@router.get("/", tags=["users"], dependencies=[Depends(get_current_user)])
-def get_users(session: Session = Depends(get_session)) -> list[User]:
-    users = session.exec(select(User).order_by(User.id.asc())).all()
-    return [user.order() for user in users]
+@router.get("/", tags=["users"], response_model=list[UserPublic], dependencies=[Depends(Authenticator(True, True))])
+def get_users(session: Session = Depends(get_session)):
+    return session.exec(select(User).order_by(User.id.asc())).all()
+
+# Create user
+@router.post("/create", tags=["users"], response_model=UserPublic, dependencies=[Depends(Authenticator(False, True))], status_code=201)
+def create_user(user: UserCreate, session: Session = Depends(get_session)):
+    # Check if user already exists
+    db_user = session.exec(select(User).where(User.discord_id == user.discord_id)).first()
+    if not db_user:
+        db_user = User(**user.model_dump())
+        session.add(db_user)
+        session.commit()
+        session.refresh(db_user)
+    return db_user
 
 # Get current user
-@router.get("/me", tags=["users"])
+@router.get("/me", tags=["users"], response_model=UserPublic)
 def get_current_user_info(current_user: User =  Depends(get_current_user)):
     return current_user
     
 # Get specific user
-@router.get("/{id}", tags=["users"], dependencies=[Depends(get_current_user)])
+@router.get("/{id}", tags=["users"], response_model=UserPublic, dependencies=[Depends(Authenticator(True, True))])
 def get_user(id: int, session: Session = Depends(get_session)) -> User:
     user = session.get(User, id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user.order()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user

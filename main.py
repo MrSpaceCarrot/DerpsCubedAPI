@@ -4,7 +4,6 @@ import uvicorn
 from fastapi import FastAPI, Depends
 from contextlib import asynccontextmanager
 from routers import auth, games, servers, users
-from auth.security import get_api_key
 from config import settings, log_config
 from schemas.database import setup_database
 
@@ -26,7 +25,7 @@ app = FastAPI(title=settings.APP_TITLE,
 # Setup routers
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(games.router, prefix="/api/games")
-app.include_router(servers.router, prefix="/api/servers", dependencies=[Depends(get_api_key)])
+app.include_router(servers.router, prefix="/api/servers")
 app.include_router(users.router, prefix="/api/users")
 
 # Run app
