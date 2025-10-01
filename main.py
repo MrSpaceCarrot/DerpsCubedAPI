@@ -1,11 +1,13 @@
 # Module Imports
 import logging
 import uvicorn
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from routers import auth, games, servers, users
 from config import settings, log_config
 from schemas.database import setup_database
+from services.storage import create_bucket
 
 # Tags metadata
 tags_metadata = [{"name": "Auth"}, {"name": "Games"}, {"name": "Servers"}, {"name": "Users"}]
@@ -14,6 +16,7 @@ tags_metadata = [{"name": "Auth"}, {"name": "Games"}, {"name": "Servers"}, {"nam
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_database()
+    create_bucket()
     yield
 
 # Create app
@@ -21,6 +24,15 @@ app = FastAPI(title=settings.APP_TITLE,
               summary=settings.APP_SUMMARY,
               version=settings.APP_VERSION,
               lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.APP_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Setup routers
 app.include_router(auth.router, prefix="/api/auth")

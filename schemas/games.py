@@ -7,6 +7,7 @@ from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship, Session, select
 import sqlalchemy as sa
 from pydantic import field_validator, model_validator
+from config import settings
 from schemas.database import engine
 
 if TYPE_CHECKING:
@@ -60,18 +61,15 @@ class GameBase(SQLModel):
     def validate_tags(cls, value: str) -> str:
         if value and (len(value) < 2 or len(value) > 5):
             raise ValueError("Number of tags must be between 2 and 5")
-        
-        with Session(engine) as session:
-            for tag in value:
-                db_tag = session.exec(select(GameTag).where(GameTag.name == tag)).first()
-                if not db_tag:
-                    raise ValueError(f"Tag '{tag}' is not in the tag whitelist")
-            return value
+        return sorted(value)
         
     @model_validator(mode="after")
     def validate(self) -> Self:
         if (self.min_party_size and self.max_party_size) and (self.min_party_size > self.max_party_size or self.max_party_size < self.min_party_size):
             raise ValueError("min_party_size must be smaller than max_party_size")
+        
+        if self.platform in ["Party", "Other"] and not self.banner_link:
+            raise ValueError("A banner link must be provided for 'Party' and 'Other' games")
         return self
 
 
@@ -80,6 +78,7 @@ class Game(GameBase, table=True):
     id: Optional[int] = Field(primary_key=True, index=True, default=None)
     install_size: Optional[int] = Field(index=True, default=None)
     banner_link: Optional[str] = Field(index=True, default=None, max_length=300)
+    banner_image: Optional[str] = Field(index=True, default=None, max_length=100)
     last_updated: Optional[datetime] = Field(index=True, default=None)
     date_added: datetime = Field(index=True, default=None)
 
@@ -100,6 +99,7 @@ class GamePublic(SQLModel):
     install_size: Optional[int]
     link: str
     banner_link: Optional[str]
+    banner_image: Optional[str]
     min_party_size: int
     max_party_size: int
     tags: List[str]
@@ -109,6 +109,12 @@ class GamePublic(SQLModel):
     update_banner_link: bool
     average_rating: Optional[float]
     popularity_score: Optional[float]
+
+    @field_validator("banner_image")
+    def validate_banner_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
 
 
 class GameCreate(GameBase):

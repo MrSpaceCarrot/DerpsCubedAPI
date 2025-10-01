@@ -2,22 +2,19 @@
 import code
 from sqlmodel import Session
 from schemas.database import engine
-from schemas.auth import *
-from schemas.games import *
-from schemas.servers import *
-from schemas.users import *
+import schemas.auth
+import schemas.games
+import schemas.servers
+import schemas.users
+import services.games
 
-session = Session(engine)
+session = Session(engine)   
 
-namespace = {
-    "session": session,
-    "ApiKey": ApiKey,
-    "Game": Game,
-    "GameTag": GameTag,
-    "GameRating": GameRating,
-    "Server": Server,
-    "ServerCategory": ServerCategory,
-    "User": User
-}
+namespace = {}
+namespace.update(vars(schemas.auth))
+namespace.update(vars(schemas.games))
+namespace.update(vars(schemas.servers))
+namespace.update(vars(schemas.users))
+namespace.update(vars(services.games))
 
 code.interact(local=namespace)

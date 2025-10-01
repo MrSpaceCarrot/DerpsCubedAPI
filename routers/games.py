@@ -8,7 +8,8 @@ from auth.security import Authenticator, get_current_user, get_current_user_can_
 from schemas.database import get_session
 from schemas.games import *
 from schemas.users import User
-from services.games import get_banner_link, get_last_updated, check_game_exists
+from services.games import *
+from services.storage import *
 
 
 router = APIRouter()
@@ -70,10 +71,14 @@ def update_game_rating(rating: GameRatingUpdate, current_user: User =  Depends(g
     # Update last_updated
     db_rating.last_updated = datetime.now(timezone.utc)
 
-    # Commit rating and return
+    # Commit rating
     session.add(db_rating)
     session.commit()
     session.refresh(db_rating)
+
+    # Update game's average rating and popularity score
+    update_average_rating(db_game.id)
+    update_popularity_score(db_game.id)
     return db_rating
 
 # Get current user's ratings
@@ -93,15 +98,30 @@ def add_game(game: GameCreate, current_user: User =  Depends(get_current_user_ca
     # Ensure that the game doesn't already exist
     check_game_exists(db_game.name, db_game.platform, db_game.link)
 
-    # Ensure that banner link and last updated is set
-    db_game.banner_link = get_banner_link(db_game.link, db_game.platform)
+    # Check that all submitted tags are valid
+    validate_tags(db_game.tags)
+
+    # Set banner link and last updated
+    if not game.banner_link:
+        db_game.banner_link = get_banner_link(db_game.link, db_game.platform)
+        if not db_game.banner_link:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=[{"type": "value_error", "loc": ["body", "link"], "msg": "Value error, Failed to get banner link, the game link is probably invalid", "input": game.link}])
     db_game.last_updated = get_last_updated(db_game.link, db_game.platform)
 
     # Set date added
     db_game.date_added = datetime.now(timezone.utc)
 
-    # Commit game to db and return
+    # Add game to session to get id
     session.add(db_game)
+    session.flush()
+
+    # Set banner image
+    banner_image_file_name = f"banner_images/{db_game.id}.png"
+    db_game.banner_image = banner_image_file_name
+    banner_image = generate_banner_image(db_game.banner_link)
+    upload_file_to_bucket(banner_image, banner_image_file_name)
+
+    # Commit game to db and return
     session.commit()
     session.refresh(db_game)
     return db_game
@@ -133,9 +153,13 @@ def edit_game(id: int, game: GameUpdate, current_user: User =  Depends(get_curre
     for key, value in game_updates.items():
         setattr(db_game, key, value)
 
-    # Ensure that banner link and last updated is set
-    db_game.banner_link = get_banner_link(db_game.link, db_game.platform)
-    db_game.last_updated = get_last_updated(db_game.link, db_game.platform)
+    # Check that all submitted tags are valid
+    validate_tags(db_game.tags)
+
+    # Set banner link, banner image, and last updated
+    update_banner_link(db_game.id)
+    update_banner_image(db_game.id)
+    update_last_updated(db_game.id)
 
     # Commit game to db and return
     session.add(db_game)
@@ -154,6 +178,11 @@ def delete_game(id: int, current_user: User =  Depends(get_current_user), sessio
     if db_game.added_by_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot delete a game you did not add")
     
+    # Remove game's banner image from storage bucket
+    banner_image_file_name = f"banner_images/{db_game.id}.png"
+    delete_file_from_bucket(banner_image_file_name)
+    
+    # Commit deletion
     session.delete(db_game)
     session.commit()
     return

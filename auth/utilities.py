@@ -23,10 +23,7 @@ def get_discord_access_token(access_code: str):
     response = requests.post(token_url, data=data, headers=headers)
     
     if response.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Error getting access token"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Error getting access token")
     return response.json().get('access_token')
 
 # Get discord user information
@@ -35,10 +32,7 @@ def get_discord_user_info(access_token: str):
     response = requests.get(settings.DISCORD_USERINFO_URL, headers=headers)
 
     if response.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Error getting user information"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Error getting user information")
     return response.json()
 
 # Create JWT token

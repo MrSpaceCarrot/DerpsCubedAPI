@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     APP_SUMMARY: str
     APP_VERSION: str
     APP_RELOAD: bool
+    APP_ORIGINS: list
 
     # Logging Settings
     LOG_LEVEL_WATCHFILES: str
@@ -21,6 +22,15 @@ class Settings(BaseSettings):
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_DATABASE: str
+
+    # Minio Settings
+    STORAGE_BUCKET_ENDPOINT: str
+    STORAGE_BUCKET_ACCESS_KEY: str
+    STORAGE_BUCKET_SECRET_KEY: str
+    STORAGE_BUCKET_NAME: str
+    STORAGE_BUCKET_CACHE_TIMEOUT: int
+    STORAGE_BUCKET_MEDIA_URL: str
+    STORAGE_BUCKET_REGION_NAME: str
 
     # Discord Oauth Settings
     DISCORD_CLIENT_ID: str
@@ -35,6 +45,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRY_MINS: int
     JWT_REFRESH_TOKEN_EXPIRY_MINS: int
+
+    # Misc Settings
+    MISC_PEOPLE_CONSTANT: int
 
     # Specify env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
