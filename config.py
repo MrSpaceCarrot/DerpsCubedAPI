@@ -10,10 +10,12 @@ class Settings(BaseSettings):
     APP_VERSION: str
     APP_RELOAD: bool
     APP_ORIGINS: list
+    APP_RUN_SCHEDULED_TASKS: bool
 
     # Logging Settings
     LOG_LEVEL_WATCHFILES: str
     LOG_LEVEL_UVICORN: str
+    LOG_LEVEL_APSCHEDULER: str
     LOG_LEVEL_SERVICES: str
 
     # Database settings
@@ -100,6 +102,11 @@ log_config = {
         'uvicorn.error': {
             'handlers': ['console', 'logfile'],
             'level': settings.LOG_LEVEL_UVICORN,
+            'propagate': False,
+        },
+        'apscheduler.scheduler': {
+            'handlers': ['console', 'logfile'],
+            'level': settings.LOG_LEVEL_APSCHEDULER,
             'propagate': False,
         },
         'services': {

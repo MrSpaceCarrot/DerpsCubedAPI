@@ -112,7 +112,7 @@ def update_last_updated(game_id: int) -> bool:
             return False
         else:
             logger.debug(f"Updating last updated for {db_game.name} from {existing_last_updated} to {new_last_updated}")
-            db_game.banner_link = new_last_updated
+            db_game.last_updated = new_last_updated
             session.add(db_game)
             session.commit()
             return True
@@ -134,7 +134,7 @@ def update_last_updated_all() -> None:
 
 # Banner Images
 # Generate a banner image from a banner link
-def generate_banner_image(banner_link: str) -> BytesIO:
+def generate_banner_image(banner_link: str) -> BytesIO | None:
     try:
         # Get image from image link
         response: requests.Response = requests.get(banner_link)
@@ -184,7 +184,7 @@ def update_banner_images() -> None:
 
 # Average Rating
 # Calculate the average rating for a game
-def calculate_average_rating(ratings: list[GameRating]) -> float:
+def calculate_average_rating(ratings: list[GameRating]) -> float | None:
     number_ratings: int = 0
     total_rating: int = 0
     for rating in ratings:
@@ -229,11 +229,13 @@ def update_average_ratings() -> None:
 
 # Popularity Score
 # Calculate the popularity score for a game
-def calculate_popularity_score(ratings: list[GameRating]) -> float:
+def calculate_popularity_score(ratings: list[GameRating]) -> float | None:
     for rating in ratings:
         if rating in [0, -1]:
             ratings.remove(rating)
     average_rating = calculate_average_rating(ratings)
+    if not average_rating:
+        return None
     people_constant = settings.MISC_PEOPLE_CONSTANT
     return round(min(1, (average_rating) * 0.12 * (len(ratings) / people_constant)), 4)
 
@@ -284,6 +286,13 @@ def get_roblox_universe_id(link: str) -> str | None:
     if response.status_code != 200:
         return None
     return response.json()["universeId"]
+
+# Games maintanence tasks that run hourly
+def three_hourly_maintanence() -> None:
+    update_banner_links()
+    update_banner_images()
+    update_average_ratings()
+    update_popularity_scores()
 
 # Check if a game already exists
 def check_game_exists(name: str, platform: str, link: str) -> None:

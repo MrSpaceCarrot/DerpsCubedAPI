@@ -7,6 +7,7 @@ import schemas.games
 import schemas.servers
 import schemas.users
 import services.games
+import auth.utilities
 
 session = Session(engine)   
 
@@ -16,5 +17,6 @@ namespace.update(vars(schemas.games))
 namespace.update(vars(schemas.servers))
 namespace.update(vars(schemas.users))
 namespace.update(vars(services.games))
+namespace.update(vars(auth.utilities))
 
 code.interact(local=namespace)

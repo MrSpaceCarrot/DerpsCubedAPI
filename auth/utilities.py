@@ -1,12 +1,18 @@
 # Module Imports
 import requests
 import jwt
+import logging
 from jwt.exceptions import ExpiredSignatureError
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials
+from sqlmodel import Session, select
 from config import settings
+from schemas.database import engine
+from schemas.auth import RefreshToken
 
+
+logger = logging.getLogger("services")
 
 # Get Discord access token from access code
 def get_discord_access_token(access_code: str):
@@ -50,3 +56,19 @@ def decode_jwt_token(jwt_token: HTTPAuthorizationCredentials):
         return decoded_jwt
     except ExpiredSignatureError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Expired token")
+
+# Clear expired refresh tokens
+def clear_expired_refresh_tokens() -> None:
+    with Session(engine) as session:
+        db_tokens = session.exec(select(RefreshToken)).all()
+        now = datetime.now(timezone.utc)
+        kept: int = 0
+        deleted: int = 0
+        for token in db_tokens:
+            if now > token.expires_at.replace(tzinfo=timezone.utc):
+                session.delete(token)
+                deleted += 1
+            else:
+                kept += 1
+        session.commit()
+        logger.info(f"Deleted {deleted} expired refresh tokens, kept {kept}")
