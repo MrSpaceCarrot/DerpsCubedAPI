@@ -6,14 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from routers import auth, games, servers, users
+from routers import auth, economy, games, servers, users
 from config import settings, log_config
 from schemas.database import setup_database
 from services.storage import *
 from services.games import *
 
 # Tags metadata
-tags_metadata = [{"name": "Auth"}, {"name": "Games"}, {"name": "Servers"}, {"name": "Users"}]
+tags_metadata = [{"name": "Auth"}, {"name": "Economy"}, {"name": "Games"}, {"name": "Servers"}, {"name": "Users"}]
 
 # Task Scheduler
 scheduler = AsyncIOScheduler()
@@ -48,6 +48,7 @@ app.add_middleware(
 
 # Setup routers
 app.include_router(auth.router, prefix="/api/auth")
+app.include_router(economy.router, prefix="/api/economy")
 app.include_router(games.router, prefix="/api/games")
 app.include_router(servers.router, prefix="/api/servers")
 app.include_router(users.router, prefix="/api/users")

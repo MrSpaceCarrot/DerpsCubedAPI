@@ -93,7 +93,11 @@ def get_last_updated(link: str, platform: str) -> str | None:
 
             if response.status_code != 200:
                 return None
-            return datetime.fromisoformat((response.json()["data"][0]["updated"])[:-1]).replace(microsecond=0)
+            try:
+                updated = (response.json()["data"][0]["updated"])[:-1]
+                return datetime.fromisoformat(updated).replace(microsecond=0)
+            except Exception:
+                return None
         
         case _:
             return None

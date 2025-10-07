@@ -129,10 +129,10 @@ def add_game(game: GameCreate, current_user: User =  Depends(get_current_user_ca
 # Get game
 @router.get("/{id}/", tags=["games"], response_model=GamePublic, dependencies=[Depends(Authenticator(True, True))])
 def get_game(id: int, session: Session = Depends(get_session)):
-    game = session.get(Game, id)
-    if not game:
+    db_game = session.get(Game, id)
+    if not db_game:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")
-    return game
+    return db_game
 
 # Edit game
 @router.patch("/{id}/", tags=["games"], response_model=GamePublic, status_code=200)

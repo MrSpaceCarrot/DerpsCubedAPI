@@ -3,6 +3,7 @@ import code
 from sqlmodel import Session
 from schemas.database import engine
 import schemas.auth
+import schemas.economy
 import schemas.games
 import schemas.servers
 import schemas.users
@@ -13,6 +14,7 @@ session = Session(engine)
 
 namespace = {}
 namespace.update(vars(schemas.auth))
+namespace.update(vars(schemas.economy))
 namespace.update(vars(schemas.games))
 namespace.update(vars(schemas.servers))
 namespace.update(vars(schemas.users))

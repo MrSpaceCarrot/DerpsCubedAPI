@@ -8,13 +8,12 @@ from sqlmodel import SQLModel, Field, Relationship, Session, select
 import sqlalchemy as sa
 from pydantic import field_validator, model_validator
 from config import settings
-from schemas.database import engine
+
 
 if TYPE_CHECKING:
     from schemas.users import User
 
 logger = logging.getLogger("services")
-
 
 # Schemas
 # Game
