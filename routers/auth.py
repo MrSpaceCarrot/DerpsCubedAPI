@@ -16,8 +16,8 @@ router = APIRouter()
 logger = logging.getLogger("services")
 
 # Redirect to discord login screen
-@router.get("/login/discord", tags=["auth"])
-def login_discord() -> RedirectResponse:
+@router.get("/discord/login", tags=["auth"])
+def discord_login() -> RedirectResponse:
     return RedirectResponse(url=settings.DISCORD_AUTHORIZE_URL)
 
 # Authenticate user once they login with discord
@@ -67,9 +67,9 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
 
     # Issue access and refresh token, save refresh token to database
     issued_at = datetime.now(timezone.utc)
-    access_token = create_jwt_token(username=user.username, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
-    refresh_token = create_jwt_token(username=user.username, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
-    db_refresh_token = RefreshToken(subject=user.username, issued_at=issued_at, expires_at=issued_at + timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
+    access_token = create_jwt_token(user_id=user.id, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+    refresh_token = create_jwt_token(user_id=user.id, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
+    db_refresh_token = RefreshToken(subject=user.id, issued_at=issued_at, expires_at=issued_at + timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
     session.add(db_refresh_token)
 
     # Return tokens
@@ -92,12 +92,12 @@ def refresh_access_token(authorization: Optional[str] = Header(None, convert_und
 
     # Decode token
     payload = decode_jwt_token(refresh_token)
-    username = payload.get("sub")
+    user_id = payload.get("sub")
     issued_at = datetime.fromtimestamp(payload.get("iat"), tz=timezone.utc)
     expires_at = datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc)
 
     # Search for token in database
-    db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == username, 
+    db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == user_id, 
                                                                RefreshToken.issued_at == issued_at,
                                                                RefreshToken.expires_at == expires_at)).first()
     
@@ -106,5 +106,5 @@ def refresh_access_token(authorization: Optional[str] = Header(None, convert_und
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     # Generate and return new token
-    new_access_token = create_jwt_token(username=payload.get("sub"), issued_at=datetime.now(timezone.utc), expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+    new_access_token = create_jwt_token(user_id=payload.get("sub"), issued_at=datetime.now(timezone.utc), expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
     return Tokens(access_token=new_access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token)

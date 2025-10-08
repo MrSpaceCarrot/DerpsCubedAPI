@@ -82,6 +82,8 @@ class Job(SQLModel, table=True):
     overridden_currency_id: Optional[int] = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="SET NULL"), nullable=True))
     overridden_currency: Optional["Currency"] = Relationship(back_populates="jobs")
 
+    user_jobs: Optional[list["UserJob"]] = Relationship(back_populates="job")
+
 
 class JobPublic(SQLModel):
     id: int
@@ -101,6 +103,9 @@ class UserJob(SQLModel, table=True):
     user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
     user: "User" = Relationship(back_populates="job")
 
+    job_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("jobs.id", ondelete="CASCADE")))
+    job: "Job" = Relationship(back_populates="user_jobs")
+
     currency_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="CASCADE")))
     currency: "Currency" = Relationship(back_populates="user_jobs")
 
@@ -117,7 +122,7 @@ class Cooldown(SQLModel, table=True):
     id: Optional[int] = Field(primary_key=True, index=True)
 
     user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
-    user: "User" = Relationship(back_populates="cooldown")
+    user: "User" = Relationship(back_populates="cooldowns")
 
     expires: datetime = Field(index=True)
     cooldown_type: str = Field(index=True, max_length=30)

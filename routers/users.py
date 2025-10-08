@@ -10,7 +10,7 @@ router = APIRouter()
 
 # Get all users
 @router.get("/", tags=["users"], response_model=list[UserPublic], dependencies=[Depends(Authenticator(True, True))])
-def get_users(session: Session = Depends(get_session)):
+def get_all_users(session: Session = Depends(get_session)):
     return session.exec(select(User).order_by(User.id.asc())).all()
 
 # Create user

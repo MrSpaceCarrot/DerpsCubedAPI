@@ -10,13 +10,13 @@ router = APIRouter()
 
 # Get all servers
 @router.get("/", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
-def get_servers(session: Session = Depends(get_session)) -> list[Server]:
+def get_all_servers(session: Session = Depends(get_session)) -> list[Server]:
     servers = session.exec(select(Server).order_by(Server.id.asc())).all()
     return [server.order() for server in servers]
     
 # Get all server categories
 @router.get("/categories/", tags=["servers"], dependencies=[Depends(Authenticator(True, True))])
-def get_server_categories(session: Session = Depends(get_session)) -> list[ServerCategory]:
+def get_all_server_categories(session: Session = Depends(get_session)) -> list[ServerCategory]:
     categories = session.exec(select(ServerCategory).order_by(ServerCategory.id.asc())).all()
     return [category.order() for category in categories]
     

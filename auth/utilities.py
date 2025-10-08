@@ -42,8 +42,8 @@ def get_discord_user_info(access_token: str):
     return response.json()
 
 # Create JWT token
-def create_jwt_token(username: str, issued_at: datetime, expires_delta: timedelta):
-    to_encode = {"sub": username,
+def create_jwt_token(user_id: str, issued_at: datetime, expires_delta: timedelta):
+    to_encode = {"sub": str(user_id),
                  "iat": issued_at,
                  "exp": issued_at + expires_delta}
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)

@@ -17,32 +17,32 @@ logger = logging.getLogger("services")
 
 # Get all games
 @router.get("/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def get_games(session: Session = Depends(get_session)):
+def get_all_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).order_by(Game.id.asc())).all()
 
 # Get 12 most recently added games
 @router.get("/recentadd/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def recently_added_games(session: Session = Depends(get_session)):
+def get_recently_added_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).order_by(Game.date_added.desc()).limit(12))
 
 # Get 12 most recently update games
 @router.get("/recentupdate/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def recently_updated_games(session: Session = Depends(get_session)):
+def get_recently_updated_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).order_by(Game.last_updated.desc()).limit(12), dependencies=[Depends(Authenticator(True, True))])
 
 # Get 12 games which have not recieved updates the longest
 @router.get("/dead/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def dead_games(session: Session = Depends(get_session)):
+def get_dead_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).where(Game.last_updated != None).order_by(Game.last_updated.asc()).limit(12))
 
 # Get 12 random games
 @router.get("/random/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def random_games(session: Session = Depends(get_session)):
+def get_random_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).order_by(func.random()).limit(12))
 
 # Get 12 highest rated games
 @router.get("/top/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(Authenticator(True, True))])
-def top_games(session: Session = Depends(get_session)):
+def get_top_games(session: Session = Depends(get_session)):
     return session.exec(select(Game).where(Game.popularity_score != None).order_by(Game.popularity_score.desc()).limit(12))
     
 # Get all game tags
