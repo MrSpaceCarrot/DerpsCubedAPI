@@ -59,14 +59,14 @@ class UserCurrency(SQLModel, table=True):
     currency_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="CASCADE")))
     currency: "Currency" = Relationship(back_populates="balances")
 
-    balance: float = Field(sa_column=sa.Column(Float(precision=53)))
+    balance: float = Field(sa_column=sa.Column(Float()))
 
 
 class UserCurrencyPublic(SQLModel):
     id: int
     user_id: int
     currency_id: int
-    balance: int
+    balance: float
 
 
 # Job
@@ -113,7 +113,8 @@ class UserJob(SQLModel, table=True):
 class UserJobPublic(SQLModel):
     id: int
     user_id: int
-    currency_id: int
+    job: JobPublic
+    currency: CurrencyPublic
 
 
 # Cooldown
@@ -124,5 +125,5 @@ class Cooldown(SQLModel, table=True):
     user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
     user: "User" = Relationship(back_populates="cooldowns")
 
-    expires: datetime = Field(index=True)
+    expires: datetime= Field(sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False))
     cooldown_type: str = Field(index=True, max_length=30)

@@ -1,5 +1,6 @@
 # Module Imports
 import logging
+from datetime import datetime, timezone
 from sqlmodel import Session, select
 from schemas.database import engine
 from schemas.economy import Currency, UserCurrency
@@ -18,3 +19,7 @@ def populate_user_currencies(user: User) -> None:
                 db_currency = UserCurrency(user_id=user.id, currency_id=currency.id, balance=currency.starting_value)
                 session.add(db_currency)
         session.commit()
+
+# Ensure a datetime object has utc information
+def ensure_aware(time: datetime):
+    return time.replace(tzinfo=timezone.utc)
