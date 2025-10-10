@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import Authenticator, get_current_user
 from schemas.database import get_session
-from schemas.economy import Currency, CurrencyPublic, UserCurrency, UserCurrencyPublic, Job, JobPublic, UserJob, UserJobPublic, Cooldown
+from schemas.economy import Currency, CurrencyPublic, UserCurrency, UserCurrencyPublic, Job, JobPublic, UserJob, UserJobPublic, Cooldown, CurrencyExchange
 from schemas.users import User
 from services.economy import ensure_aware
 
@@ -17,6 +17,51 @@ router = APIRouter()
 @router.get("/currencies", tags=["economy"], response_model=list[CurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
 def get_all_currencies(session: Session = Depends(get_session)):
     return session.exec(select(Currency).order_by(Currency.id.asc())).all()
+
+# Exchange currency
+@router.post("/currencies/exchange", tags=["economy"])
+def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    current_user = session.merge(current_user)
+    # Validate currency from
+    currency_from = session.get(Currency, currency_exchange.currency_from_id)
+    if not currency_from:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{Currency from} not found")
+    if not currency_from.can_exchange:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
+
+    # Validate currency to
+    currency_to = session.get(Currency, currency_exchange.currency_to_id)
+    if not currency_to:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency to not found")
+    if not currency_to.can_exchange:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange to {currency_to.display_name}")
+    
+    # Ensure both currencies are not the same
+    if currency_from == currency_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot convert {currency_from.display_name} into {currency_to.display_name}")
+    
+    # Get user balances
+    user_currency_from = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_from.id)).first()
+    user_currency_to = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_to.id)).first()
+
+    # Check that user has enough balance of given currency
+    if user_currency_from.balance < currency_exchange.amount:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {currency_from.display_name} balance (have {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}, need {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f})")
+
+    # Calculate exchange rate between currencies
+    relative_rate = currency_from.exchange_rate / currency_to.exchange_rate
+    currency_to_amount_gained = currency_exchange.amount * relative_rate
+
+    # Update user balances
+    user_currency_from.balance -= currency_exchange.amount
+    user_currency_to.balance += currency_to_amount_gained
+    session.add(user_currency_from, user_currency_to)
+    session.commit()
+    session.refresh(user_currency_from, user_currency_to)
+
+    # Return
+    return f"Converted {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"
+    
 
 # Get all balances
 @router.get("/balances", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
@@ -52,7 +97,7 @@ def apply_for_job(current_user: User = Depends(get_current_user), session: Sessi
     current_user = session.merge(current_user)
     # Check existing job
     if current_user.job:
-        raise HTTPException(status_code=status.HTTP_200_OK, detail=f"You already have a job")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You already have a job")
     
     # Check cooldown
     for cooldown in current_user.cooldowns:
@@ -105,13 +150,13 @@ def work_job(current_user: User = Depends(get_current_user), session: Session = 
     current_user = session.merge(current_user)
     # Check job
     if not current_user.job:
-        raise HTTPException(status_code=status.HTTP_200_OK, detail=f"You cannot work without a job")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot work without a job")
     
     # Check cooldown
     for cooldown in current_user.cooldowns:
         if cooldown.cooldown_type == "work" and ensure_aware(cooldown.expires) > datetime.now(timezone.utc):
             expires_in = ensure_aware(cooldown.expires) - datetime.now(timezone.utc)
-            raise HTTPException(status_code=status.HTTP_200_OK, detail=f"You can work again in {expires_in.seconds}s")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"You can work again in {expires_in.seconds}s")
         session.delete(cooldown)
 
     # Pay user
@@ -129,7 +174,7 @@ def work_job(current_user: User = Depends(get_current_user), session: Session = 
     # Generate response string
     currency_paid = current_user.job.currency
     currency_prefix = '' if currency_paid.prefix == None else currency_paid.prefix
-    response_string = f"You went to work and were paid {currency_prefix}{round(pay_amount, currency_paid.decimal_places)} {currency_paid.display_name}. You may work again in {job.cooldown:.0f}s."
+    response_string = f"You went to work and were paid {currency_prefix}{pay_amount:.{currency_paid.decimal_places}f} {currency_paid.display_name}. You may work again in {job.cooldown:.0f}s."
 
     # Send response
     return response_string
@@ -142,8 +187,6 @@ def get_user_job(user_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return session.exec(select(UserJob).where(UserJob.user_id == user_id)).first()
 
-
-# Exchange currency (confirmation should take place on frontend)
 
 # Gift Currency
 

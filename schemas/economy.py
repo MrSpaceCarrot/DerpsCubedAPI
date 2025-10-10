@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from sqlmodel import SQLModel, Float, Field, Relationship
 import sqlalchemy as sa
+from pydantic import field_validator
 
 
 if TYPE_CHECKING:
@@ -127,3 +128,16 @@ class Cooldown(SQLModel, table=True):
 
     expires: datetime= Field(sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False))
     cooldown_type: str = Field(index=True, max_length=30)
+
+
+# Currency Exchange
+class CurrencyExchange(SQLModel):
+    currency_from_id: int
+    currency_to_id: int
+    amount: float
+
+    @field_validator("amount")
+    def validate_amount(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Amount must be greater than 0")
+        return value
