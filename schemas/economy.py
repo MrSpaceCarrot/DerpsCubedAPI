@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 from sqlmodel import SQLModel, Float, Field, Relationship
 import sqlalchemy as sa
 from pydantic import field_validator
+from schemas.users import UserPublicShort
 
 
 if TYPE_CHECKING:
@@ -65,9 +66,14 @@ class UserCurrency(SQLModel, table=True):
 
 class UserCurrencyPublic(SQLModel):
     id: int
-    user_id: int
+    user: UserPublicShort
     currency_id: int
     balance: float
+
+
+class UserCurrencyLeaderboard(SQLModel):
+    currency: CurrencyPublic
+    user_currencies: Optional[list[UserCurrencyPublic]]
 
 
 # Job

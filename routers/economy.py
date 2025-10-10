@@ -7,7 +7,7 @@ from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import Authenticator, get_current_user
 from schemas.database import get_session
-from schemas.economy import Currency, CurrencyPublic, UserCurrency, UserCurrencyPublic, Job, JobPublic, UserJob, UserJobPublic, Cooldown, CurrencyExchange
+from schemas.economy import *
 from schemas.users import User
 from services.economy import ensure_aware
 
@@ -62,7 +62,6 @@ def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = 
     # Return
     return f"Converted {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"
     
-
 # Get all balances
 @router.get("/balances", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
 def get_all_balances(session: Session = Depends(get_session)):
@@ -72,6 +71,15 @@ def get_all_balances(session: Session = Depends(get_session)):
 @router.get("/balances/me", tags=["economy"], response_model=list[UserCurrencyPublic])
 def get_current_user_balances(current_user: User =  Depends(get_current_user), session: Session = Depends(get_session)):
     return session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id).order_by(UserCurrency.id.asc())).all()
+
+# Get leaderboard for a given currency
+@router.get("/balances/leaderboard/{id}", tags=["economy"], response_model=UserCurrencyLeaderboard, dependencies=[Depends(Authenticator(True, True))])
+def get_balances_leaderboard(currency_id: int, session: Session = Depends(get_session)):
+    db_currency = session.exec(select(Currency).where(Currency.id == currency_id)).first()
+    if not db_currency:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
+    db_user_currencies = session.exec(select(UserCurrency).where(UserCurrency.currency_id == currency_id).order_by(UserCurrency.balance.desc())).all()
+    return UserCurrencyLeaderboard(currency=db_currency, user_currencies=db_user_currencies)
 
 # Get balances for a specific user
 @router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
@@ -189,8 +197,6 @@ def get_user_job(user_id: int, session: Session = Depends(get_session)):
 
 
 # Gift Currency
-
-# Currency Leaderboard
 
 # Get Currency Exchange Rates
 

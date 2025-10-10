@@ -45,8 +45,14 @@ class UserPublic(SQLModel):
     can_add_games: Optional[bool]
 
 
+class UserPublicShort(SQLModel):
+    id: int
+    discord_id: str
+
+
 class UserCreate(SQLModel):
     discord_id: str
+
 
 class UserUpdate(SQLModel):
     display_name: Optional[str]
