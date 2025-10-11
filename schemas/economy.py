@@ -50,6 +50,13 @@ class CurrencyPublic(SQLModel):
     color: str
 
 
+class CurrencyPublicShort(SQLModel):
+    id: int
+    name: str
+    display_name: str
+    prefix: Optional[str]
+
+
 # UserCurrency
 class UserCurrency(SQLModel, table=True):
     __tablename__ = "user_currencies"
@@ -67,9 +74,9 @@ class UserCurrency(SQLModel, table=True):
 class UserCurrencyPublic(SQLModel):
     id: int
     user: UserPublicShort
-    currency_id: int
+    currency: CurrencyPublicShort
     balance: float
-
+    
 
 class UserCurrencyLeaderboard(SQLModel):
     currency: CurrencyPublic
@@ -147,3 +154,11 @@ class CurrencyExchange(SQLModel):
         if value < 0:
             raise ValueError("Amount must be greater than 0")
         return value
+
+
+# Gift
+class Gift(SQLModel):
+    user_id: Optional[int] = None
+    discord_id: Optional[str] = None
+    currency_id: int
+    amount: float

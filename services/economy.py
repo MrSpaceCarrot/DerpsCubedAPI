@@ -15,7 +15,8 @@ def populate_user_currencies(user: User) -> None:
     with Session(engine) as session:
         db_currencies = session.exec(select(Currency)).all()
         for currency in db_currencies:
-            if currency not in user.balances:
+            filtered_user_currency = [user_currency for user_currency in user.balances if user_currency.currency == currency]
+            if not filtered_user_currency:
                 db_currency = UserCurrency(user_id=user.id, currency_id=currency.id, balance=currency.starting_value)
                 session.add(db_currency)
         session.commit()
@@ -23,3 +24,10 @@ def populate_user_currencies(user: User) -> None:
 # Ensure a datetime object has utc information
 def ensure_aware(time: datetime):
     return time.replace(tzinfo=timezone.utc)
+
+# Populate currencies for all existing users
+def populate_all_user_currencies():
+    with Session(engine) as session:
+        db_users = session.exec(select(User)).all()
+        for user in db_users:
+            populate_user_currencies(user)

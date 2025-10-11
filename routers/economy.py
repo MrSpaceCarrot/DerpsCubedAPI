@@ -10,6 +10,7 @@ from schemas.database import get_session
 from schemas.economy import *
 from schemas.users import User
 from services.economy import ensure_aware
+from services.users import get_or_create_user
 
 router = APIRouter()
 
@@ -25,7 +26,7 @@ def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = 
     # Validate currency from
     currency_from = session.get(Currency, currency_exchange.currency_from_id)
     if not currency_from:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="{Currency from} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency from not found")
     if not currency_from.can_exchange:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
 
@@ -80,6 +81,46 @@ def get_balances_leaderboard(currency_id: int, session: Session = Depends(get_se
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
     db_user_currencies = session.exec(select(UserCurrency).where(UserCurrency.currency_id == currency_id).order_by(UserCurrency.balance.desc())).all()
     return UserCurrencyLeaderboard(currency=db_currency, user_currencies=db_user_currencies)
+
+# Gift Currency
+@router.post("/balances/gift", tags=["economy"])
+def gift(gift: Gift, current_user: User =  Depends(get_current_user), session: Session = Depends(get_session)):
+    current_user: User = session.merge(current_user)
+
+    # Get target user using either discord_id or id
+    if gift.discord_id:
+        db_recieving_user: User = get_or_create_user(gift.discord_id)
+    elif gift.user_id:
+        db_recieving_user: User = session.get(User, gift.user_id)
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either a id or discord_id of a user must be provided")
+    
+    # Validate gift currency
+    db_currency: Currency = session.get(Currency, gift.currency_id)
+    if not db_currency:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
+    
+    # Check that currency can be gifted
+    if not db_currency.can_exchange:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This currency cannot be gifted")
+    
+    # Get user balances for currency being gifted
+    db_sending_user_currency: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == gift.currency_id)).first()
+    db_recieving_user_currency: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == db_recieving_user.id, UserCurrency.currency_id == gift.currency_id)).first()
+
+    # Check if enough currency
+    if db_sending_user_currency.balance < gift.amount:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {db_currency.display_name} balance (have {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}, need {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f})")
+
+    # Change balances
+    db_sending_user_currency.balance -= gift.amount
+    db_recieving_user_currency.balance += gift.amount
+    session.add(db_sending_user_currency, db_recieving_user_currency)
+    session.commit()
+    session.refresh(db_sending_user_currency, db_recieving_user_currency)
+
+    # Return
+    return f"You have gifted {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f} {db_currency.display_name} to {db_recieving_user.discord_id}. Your {db_currency.display_name} balance is now {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}"
 
 # Get balances for a specific user
 @router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
@@ -150,7 +191,7 @@ def quit_job(current_user: User = Depends(get_current_user), session: Session = 
     old_job_name = current_user.job.job.display_name
     session.delete(current_user.job)
     session.commit()
-    return f"You quit your previous job of being a {old_job_name}. You can apply for another job in 300s"
+    return f"You quit your previous job of {old_job_name}. You can apply for another job in 300s"
 
 # Work Job
 @router.post("/jobs/work", tags=["economy"])
@@ -195,8 +236,6 @@ def get_user_job(user_id: int, session: Session = Depends(get_session)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return session.exec(select(UserJob).where(UserJob.user_id == user_id)).first()
 
-
-# Gift Currency
 
 # Get Currency Exchange Rates
 
