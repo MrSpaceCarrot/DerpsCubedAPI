@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from sqlalchemy import func
-from auth.security import Authenticator, get_current_user
+from auth.security import require_permission
 from schemas.database import get_session
 from schemas.economy import *
 from schemas.users import User
@@ -16,13 +16,13 @@ from services.users import get_or_create_user
 router = APIRouter()
 
 # Get all currencies
-@router.get("/currencies", tags=["economy"], response_model=list[CurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
+@router.get("/currencies", tags=["economy"], response_model=list[CurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
 def get_all_currencies(session: Session = Depends(get_session)):
     return session.exec(select(Currency).order_by(Currency.id.asc())).all()
 
 # Exchange currency
 @router.post("/currencies/exchange", tags=["economy"])
-def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
     # Validate currency from
     currency_from: Currency = session.get(Currency, currency_exchange.currency_from_id)
@@ -65,17 +65,17 @@ def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = 
     return f"Converted {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"
     
 # Get all balances
-@router.get("/balances", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
+@router.get("/balances", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
 def get_all_balances(session: Session = Depends(get_session)):
     return session.exec(select(UserCurrency).order_by(UserCurrency.id.asc())).all()
 
 # Get current user's balance
 @router.get("/balances/me", tags=["economy"], response_model=list[UserCurrencyPublic])
-def get_current_user_balances(current_user: User =  Depends(get_current_user), session: Session = Depends(get_session)):
+def get_current_user_balances(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     return session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id).order_by(UserCurrency.id.asc())).all()
 
 # Get leaderboard for a given currency
-@router.get("/balances/leaderboard/{id}", tags=["economy"], response_model=UserCurrencyLeaderboard, dependencies=[Depends(Authenticator(True, True))])
+@router.get("/balances/leaderboard/{id}", tags=["economy"], response_model=UserCurrencyLeaderboard, dependencies=[Depends(require_permission("can_use_economy"))])
 def get_balances_leaderboard(currency_id: int, session: Session = Depends(get_session)):
     db_currency = session.exec(select(Currency).where(Currency.id == currency_id)).first()
     if not db_currency:
@@ -85,7 +85,7 @@ def get_balances_leaderboard(currency_id: int, session: Session = Depends(get_se
 
 # Gift Currency
 @router.post("/balances/gift", tags=["economy"])
-def gift(gift: Gift, current_user: User =  Depends(get_current_user), session: Session = Depends(get_session)):
+def gift(gift: Gift, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
 
     # Get target user using either discord_id or id
@@ -124,7 +124,7 @@ def gift(gift: Gift, current_user: User =  Depends(get_current_user), session: S
     return f"You have gifted {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f} {db_currency.display_name} to {db_recieving_user.discord_id}. Your {db_currency.display_name} balance is now {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}"
 
 # Get balances for a specific user
-@router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(Authenticator(True, True))])
+@router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
 def get_user_balances(user_id: int, session: Session = Depends(get_session)):
     db_user: User = session.exec(select(User).where(User.id == user_id)).first()
     if not db_user:
@@ -132,18 +132,18 @@ def get_user_balances(user_id: int, session: Session = Depends(get_session)):
     return session.exec(select(UserCurrency).where(UserCurrency.user_id == user_id).order_by(UserCurrency.id.asc())).all()
 
 # Get all jobs
-@router.get("/jobs", tags=["economy"], response_model=list[JobPublic], dependencies=[Depends(Authenticator(True, True))])
+@router.get("/jobs", tags=["economy"], response_model=list[JobPublic], dependencies=[Depends(require_permission("can_use_economy"))])
 def get_all_jobs(session: Session = Depends(get_session)):
     return session.exec(select(Job).order_by(Job.id.asc())).all()
 
 # Get current user's job
 @router.get("/jobs/me", tags=["economy"], response_model=Optional[UserJobPublic])
-def get_current_user_job(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def get_current_user_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     return session.exec(select(UserJob).where(UserJob.user_id == current_user.id)).first()
 
 # Apply for job
 @router.post("/jobs/apply", tags=["economy"], response_model=Optional[UserJobPublic])
-def apply_for_job(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def apply_for_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
     # Check existing job
     if current_user.job:
@@ -172,7 +172,7 @@ def apply_for_job(current_user: User = Depends(get_current_user), session: Sessi
 
 # Quit job
 @router.post("/jobs/quit", tags=["economy"])
-def quit_job(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def quit_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
 
     # Ensure job exists
@@ -196,7 +196,7 @@ def quit_job(current_user: User = Depends(get_current_user), session: Session = 
 
 # Work Job
 @router.post("/jobs/work", tags=["economy"])
-def work_job(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def work_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
     # Check job
     if not current_user.job:
@@ -230,7 +230,7 @@ def work_job(current_user: User = Depends(get_current_user), session: Session = 
     return response_string
 
 # Get job for a specific user
-@router.get("/jobs/{user_id}", tags=["economy"], response_model=UserJobPublic | None, dependencies=[Depends(Authenticator(True, True))])
+@router.get("/jobs/{user_id}", tags=["economy"], response_model=UserJobPublic | None, dependencies=[Depends(require_permission("can_use_economy"))])
 def get_user_job(user_id: int, session: Session = Depends(get_session)):
     db_user: User = session.exec(select(User).where(User.id == user_id)).first()
     if not db_user:
@@ -239,7 +239,7 @@ def get_user_job(user_id: int, session: Session = Depends(get_session)):
 
 # Blackjack
 @router.post("/gambling/blackjack", tags=["economy"], response_model=BlackjackGamePublic)
-def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
 
     # Get details from request

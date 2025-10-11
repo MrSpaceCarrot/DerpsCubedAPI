@@ -10,6 +10,7 @@ from auth.utilities import *
 from schemas.database import get_session
 from schemas.auth import Tokens, RefreshToken
 from schemas.users import User
+from services.users import get_or_create_user
 
 
 router = APIRouter()
@@ -36,26 +37,15 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
     # Get discord user information
     user_info = get_discord_user_info(access_token)
 
-    # Get user from database
-    user: User = session.exec(select(User).where(User.discord_id == user_info["id"])).first()
+    # Get user
+    user: User = get_or_create_user(user_info["id"])
 
-    # Create user if they do not already exist
-    first_site_use = False
-    if not user:
-        user = User(discord_id=user_info["id"])
-        first_site_use = True
-
-    # Check if user exists but is doing first login
+    # Setup user if they exist but are doing first login
     if user.first_site_login == None:
-        first_site_use = True
-
-    # Setup user if using site for first time
-    if first_site_use:
         user.first_site_login = datetime.now(timezone.utc)
         user.display_name = user_info["username"]
         user.can_use_site = False
-        user.can_add_games = False
-
+        
         # Check if user is in whitelisted discord servers
         # TO DO
 

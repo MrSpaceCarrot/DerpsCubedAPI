@@ -10,6 +10,22 @@ if TYPE_CHECKING:
 
 
 # Schemas
+# Permission
+class UserPermission(SQLModel, table=True):
+    __tablename__ = "user_permissions"
+    user_id: int = Field(foreign_key="users.id", primary_key=True)
+    permission_id: int = Field(foreign_key="permissions.id", primary_key=True)
+
+
+class Permission(SQLModel, table=True):
+    __tablename__ = "permissions"
+    id: Optional[int] = Field(primary_key=True, index=True)
+    code: str = Field(index=True, max_length=30)
+    description: str = Field(index=True, max_length=100)
+
+    users: Optional[list["User"]] = Relationship(back_populates="permissions", link_model=UserPermission)
+
+
 # User
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -22,7 +38,6 @@ class User(SQLModel, table=True):
     display_name: Optional[str] = Field(index=True, default=None, max_length=100)
     display_name_last_changed: Optional[datetime] = Field(index=True, default=None)
     can_use_site: Optional[bool] = Field(index=True, default=None)
-    can_add_games: Optional[bool] = Field(index=True, default=None)
 
     api_keys: Optional[list["ApiKey"]] = Relationship(back_populates="user")
     games_added: Optional[List["Game"]] = Relationship(back_populates="added_by")
@@ -31,6 +46,7 @@ class User(SQLModel, table=True):
     job: Optional["UserJob"] = Relationship(back_populates="user")
     cooldowns: Optional[list["Cooldown"]] = Relationship(back_populates="user")
     blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="user")
+    permissions: Optional[List["Permission"]] = Relationship(back_populates="users", link_model=UserPermission)
 
 
 class UserPublic(SQLModel):
@@ -44,6 +60,7 @@ class UserPublic(SQLModel):
     display_name_last_changed: Optional[datetime]
     can_use_site: Optional[bool]
     can_add_games: Optional[bool]
+    permissions: Optional[list["Permission"]]
 
 
 class UserPublicShort(SQLModel):
