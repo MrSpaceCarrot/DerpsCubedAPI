@@ -5,7 +5,7 @@ from sqlmodel import SQLModel, Field, Relationship
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
-    from schemas.economy import UserCurrency, UserJob, Cooldown
+    from schemas.economy import UserCurrency, UserJob, Cooldown, BlackjackGame
     from schemas.games import Game, GameRating
 
 
@@ -30,6 +30,7 @@ class User(SQLModel, table=True):
     balances: Optional[list["UserCurrency"]] = Relationship(back_populates="user")
     job: Optional["UserJob"] = Relationship(back_populates="user")
     cooldowns: Optional[list["Cooldown"]] = Relationship(back_populates="user")
+    blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="user")
 
 
 class UserPublic(SQLModel):

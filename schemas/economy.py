@@ -1,9 +1,11 @@
 # Module Imports
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, List
 from sqlmodel import SQLModel, Float, Field, Relationship
 import sqlalchemy as sa
+from sqlalchemy import JSON
+from sqlalchemy.ext.mutable import MutableList
 from pydantic import field_validator
 from schemas.users import UserPublicShort
 
@@ -33,6 +35,7 @@ class Currency(SQLModel, table=True):
     balances: Optional[list["UserCurrency"]] = Relationship(back_populates="currency")
     jobs: Optional[list["Job"]] = Relationship(back_populates="overridden_currency")
     user_jobs: Optional[list["UserJob"]] = Relationship(back_populates="currency")
+    blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="currency")
 
 
 class CurrencyPublic(SQLModel):
@@ -162,3 +165,64 @@ class Gift(SQLModel):
     discord_id: Optional[str] = None
     currency_id: int
     amount: float
+
+    @field_validator("amount")
+    def validate_amount(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("Amount must be greater than 0")
+        return value
+    
+
+# Blackjack
+class BlackjackGame(SQLModel, table=True):
+    __tablename__ = "blackjack_games"
+    id: Optional[int] = Field(primary_key=True, index=True)
+    code: str = Field(index=True, max_length=36)
+
+    user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
+    user: "User" = Relationship(back_populates="blackjack_games")
+
+    user_hand: List[str] = Field(sa_column=sa.Column(MutableList.as_mutable(JSON), nullable=False,))
+    user_hand_value: int = Field(index=True)
+    dealer_hand: List[str] = Field(sa_column=sa.Column(MutableList.as_mutable(JSON), nullable=False))
+    dealer_hand_value: int = Field(index=True)
+
+    currency_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="SET NULL")))
+    currency: "Currency" = Relationship(back_populates="blackjack_games")
+
+    bet: float = Field(sa_column=sa.Column(Float()))
+    result: Optional[str] = Field(index=True, max_length=4)
+    result_text: Optional[str] = Field(index=True, max_length=300)
+
+
+class BlackjackGamePublic(SQLModel):
+    id: int
+    code: str
+    user: UserPublicShort
+    user_hand: List[str]
+    user_hand_value: int
+    dealer_hand: List[str]
+    dealer_hand_value: int
+    currency: CurrencyPublicShort
+    bet: float
+    result: Optional[str]
+    result_text: Optional[str]
+
+
+class BlackjackGameUpdate(SQLModel):
+    currency_id: Optional[int] = None
+    bet: Optional[float] = None
+    code: Optional[str] = None
+    action: Optional[str] = None
+
+    @field_validator("bet")
+    def validate_bet(cls, value: str) -> float:
+        if value and value < 0:
+            raise ValueError("Bet must be greater that 0'")
+        return value
+
+    @field_validator("action")
+    def validate_action(cls, value: str) -> float:
+        if value and value not in ["Hit", "Stand"]:
+            raise ValueError("Action must either be 'Hit' or 'Stand'")
+        return value
