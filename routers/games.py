@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import require_permission
-from schemas.database import get_session
+from schemas.database import get_session, apply_filters
 from schemas.games import *
 from schemas.users import User
 from services.games import *
@@ -15,40 +15,33 @@ from services.storage import *
 router = APIRouter()
 logger = logging.getLogger("services")
 
-# Get all games
-@router.get("/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_all_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).order_by(Game.id.asc())).all()
-
-# Get 12 most recently added games
-@router.get("/recentadd/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_recently_added_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).order_by(Game.date_added.desc()).limit(12))
-
-# Get 12 most recently update games
-@router.get("/recentupdate/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_recently_updated_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).order_by(Game.last_updated.desc()).limit(12))
-
-# Get 12 games which have not recieved updates the longest
-@router.get("/dead/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_dead_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).where(Game.last_updated != None).order_by(Game.last_updated.asc()).limit(12))
-
-# Get 12 random games
-@router.get("/random/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_random_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).order_by(func.random()).limit(12))
-
-# Get 12 highest rated games
-@router.get("/top/", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_top_games(session: Session = Depends(get_session)):
-    return session.exec(select(Game).where(Game.popularity_score != None).order_by(Game.popularity_score.desc()).limit(12))
+# Get games
+@router.get("", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
+def get_games(filters: FilterGame = Depends(), session: Session = Depends(get_session)):
+    query = select(Game)
+    query = apply_filters(query, Game, filters)
+    return session.exec(query)
     
-# Get all game tags
-@router.get("/tags/", tags=["games"], response_model=list[GameTag], dependencies=[Depends(require_permission("can_view_games"))])
-def get_game_tags(session: Session = Depends(get_session)):
-    return session.exec(select(GameTag).order_by(GameTag.id.asc())).all()
+# Get game tags
+@router.get("/tags", tags=["games"], response_model=list[GameTag], dependencies=[Depends(require_permission("can_view_games"))])
+def get_game_tags(filters: FilterGameTag = Depends(), session: Session = Depends(get_session)):
+    query = select(GameTag)
+    query = apply_filters(query, GameTag, filters)
+    return session.exec(query)
+
+# Get game ratings
+@router.get("/ratings", tags=["games"], response_model=list[GameRatingPublic], dependencies=[Depends(require_permission("can_view_games"))])
+def get_game_ratings(filters: FilterGameRating = Depends(), session: Session = Depends(get_session)):
+    query = select(GameRating)
+    query = apply_filters(query, GameRating, filters)
+    return session.exec(query)
+
+# Get current user's ratings
+@router.get("/ratings/me", tags=["games"], response_model=list[GameRatingPublic])
+def get_current_user_game_ratings(filters: FilterGameRating = Depends(), current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)):
+    query = select(GameRating).where(GameRating.user_id == current_user.id)
+    query = apply_filters(query, GameRating, filters)
+    return session.exec(query)
 
 # Update game rating
 @router.post("/ratings/update", tags=["games"], response_model=GameRatingPublic)
@@ -81,13 +74,8 @@ def update_game_rating(rating: GameRatingUpdate, current_user: User =  Depends(r
     update_popularity_score(db_game.id)
     return db_rating
 
-# Get current user's ratings
-@router.get("/ratings/me", tags=["games"], response_model=list[GameRatingPublic])
-def get_current_user_ratings(current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)):
-    return session.exec(select(GameRating).where(GameRating.user_id == current_user.id).order_by(GameRating.id.asc())).all() 
-
 # Add game
-@router.post("/add/", tags=["games"], response_model=GamePublic, status_code=201)
+@router.post("/add", tags=["games"], response_model=GamePublic, status_code=201)
 def add_game(game: GameCreate, current_user: User =  Depends(require_permission("can_add_games")), session: Session = Depends(get_session)):
     # Create game instance using validated user data
     db_game = Game(**game.model_dump())
@@ -127,7 +115,7 @@ def add_game(game: GameCreate, current_user: User =  Depends(require_permission(
     return db_game
 
 # Get game
-@router.get("/{id}/", tags=["games"], response_model=GamePublic, dependencies=[Depends(require_permission("can_view_games"))])
+@router.get("/{id}", tags=["games"], response_model=GamePublic, dependencies=[Depends(require_permission("can_view_games"))])
 def get_game(id: int, session: Session = Depends(get_session)):
     db_game = session.get(Game, id)
     if not db_game:
@@ -135,7 +123,7 @@ def get_game(id: int, session: Session = Depends(get_session)):
     return db_game
 
 # Edit game
-@router.patch("/{id}/", tags=["games"], response_model=GamePublic, status_code=200)
+@router.patch("/{id}", tags=["games"], response_model=GamePublic, status_code=200)
 def edit_game(id: int, game: GameUpdate, current_user: User =  Depends(require_permission("can_add_games")), session: Session = Depends(get_session)):
     # Ensure game exists
     db_game = session.get(Game, id)
@@ -168,7 +156,7 @@ def edit_game(id: int, game: GameUpdate, current_user: User =  Depends(require_p
     return db_game
 
 # Delete game
-@router.delete("/{id}/", tags=["games"], status_code=204)
+@router.delete("/{id}", tags=["games"], status_code=204)
 def delete_game(id: int, current_user: User =  Depends(require_permission("can_delete_games")), session: Session = Depends(get_session)):
     db_game = session.get(Game, id)
     if not db_game:

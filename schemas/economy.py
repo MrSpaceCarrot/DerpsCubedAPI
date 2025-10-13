@@ -1,7 +1,7 @@
 # Module Imports
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Literal
 from sqlmodel import SQLModel, Float, Field, Relationship
 import sqlalchemy as sa
 from sqlalchemy import JSON
@@ -60,6 +60,16 @@ class CurrencyPublicShort(SQLModel):
     prefix: Optional[str]
 
 
+class FilterCurrency(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    can_gamble: Optional[bool] = None
+    can_exchange: Optional[bool] = None
+    can_work_for: Optional[bool] = None
+    order_by: Optional[Literal["id", "name", "display_name"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+
+
 # UserCurrency
 class UserCurrency(SQLModel, table=True):
     __tablename__ = "user_currencies"
@@ -84,6 +94,15 @@ class UserCurrencyPublic(SQLModel):
 class UserCurrencyLeaderboard(SQLModel):
     currency: CurrencyPublic
     user_currencies: Optional[list[UserCurrencyPublic]]
+
+
+class FilterUserCurrency(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    user_id: Optional[int] = None
+    currency_id: Optional[int] = None
+    order_by: Optional[Literal["id", "user_id", "currency_id"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
 
 
 # Job
@@ -112,6 +131,13 @@ class JobPublic(SQLModel):
     overridden_currency_id: Optional[int]
 
 
+class FilterJob(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    order_by: Optional[Literal["id", "name", "display_name", "min_pay", "max_pay", "cooldown"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+
+
 # UserJob
 class UserJob(SQLModel, table=True):
     __tablename__ = "user_jobs"
@@ -129,9 +155,19 @@ class UserJob(SQLModel, table=True):
 
 class UserJobPublic(SQLModel):
     id: int
-    user_id: int
+    user: UserPublicShort
     job: JobPublic
     currency: CurrencyPublic
+
+
+class FilterUserJob(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    user_id: Optional[int] = None
+    job_id: Optional[int] = None
+    currency: Optional[int] = None
+    order_by: Optional[Literal["id", "user_id", "job_id", "currency_id"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
 
 
 # Cooldown

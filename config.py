@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     DISCORD_ACCESS_TOKEN_URL: str
     DISCORD_USERINFO_URL: str
 
+    # Pterodactyl Panel Settings
+    PTERODACTYL_DOMAIN: str
+    PTERODACTYL_CLIENT_API_KEY: str
+
     # JWT Settings
     JWT_SECRET_KEY: str
     JWT_ALGORITHM: str

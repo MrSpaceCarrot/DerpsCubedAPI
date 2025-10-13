@@ -1,20 +1,25 @@
 # Module Imports
+import logging
+from typing import Annotated
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from sqlmodel import Session, select
 from auth.security import require_permission, Authenticator
-from schemas.database import get_session
-from schemas.users import User, UserPublic, UserCreate, UserUpdate
+from schemas.database import get_session, apply_filters
+from schemas.users import *
 
 router = APIRouter()
+logger = logging.getLogger("services")
 
-# Get all users
-@router.get("/", tags=["users"], response_model=list[UserPublic], dependencies=[Depends(require_permission("can_view_users"))])
-def get_all_users(session: Session = Depends(get_session)):
-    return session.exec(select(User).order_by(User.id.asc())).all()
+# Get users
+@router.get("", tags=["users"], response_model=list[UserPublic], dependencies=[Depends(require_permission("can_view_users"))])
+def get_users(filters: FilterUser = Depends(), session: Session = Depends(get_session)):
+    query = select(User)
+    query = apply_filters(query, User, filters)
+    return session.exec(query).all()
 
 # Create user
-@router.post("/create", tags=["users"], response_model=UserPublic, dependencies=[Depends(require_permission("can_view_users"))], status_code=201)
+@router.post("/create", tags=["users"], response_model=UserPublic, dependencies=[Depends(require_permission("can_manage_users"))], status_code=201)
 def create_user(user: UserCreate, session: Session = Depends(get_session)):
     # Check if user already exists
     db_user = session.exec(select(User).where(User.discord_id == user.discord_id)).first()

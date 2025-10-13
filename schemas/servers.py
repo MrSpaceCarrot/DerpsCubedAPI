@@ -1,62 +1,168 @@
 # Module Imports
-from typing import Optional
-from sqlmodel import SQLModel, Field
+import sqlalchemy as sa
+from typing import Optional, Literal
+from sqlmodel import SQLModel, Field, Relationship
 
 
-class Server(SQLModel, table=True):
-    __tablename__ = "servers"
-    id: int = Field(primary_key=True, index=True)
-    name: Optional[str] = Field(index=True, default=None, max_length=25)
-    description: Optional[str] = Field(index=True, default=None, max_length=150)
-    category: Optional[str] = Field(index=True, default=None, max_length=25)
-    version: Optional[str] = Field(index=True, default=None, max_length=25)
-    modloader: Optional[str] = Field(index=True, default=None, max_length=20)
+# Schemas
+# Server
+class ServerBase(SQLModel):
+    name: str = Field(..., index=True, max_length=25, unique=True)
+    display_name: str = Field(..., index=True, max_length=25)
+    description: str = Field(..., index=True, max_length=150)
+    category_id: int
+    version: str = Field(..., index=True, max_length=25)
+    modloader: str = Field(..., index=True, max_length=20)
     modlist: Optional[str] = Field(index=True, default=None, max_length=300)
     moddownload: Optional[str] = Field(index=True, default=None, max_length=150)
-    is_active: Optional[bool] = Field(index=True, default=None)
-    is_compatible: Optional[bool] = Field(index=True, default=None)
     modconditions: Optional[str] = Field(index=True, default=None, max_length=150)
+    is_active: bool = Field(..., index=True)
+    is_compatible: bool = Field(..., index=True)
     icon: Optional[str] = Field(index=True, default=None, max_length=45)
     color: Optional[str] = Field(index=True, default=None, max_length=25)
-    port: Optional[int] = Field(index=True, default=None)
-    emoji: Optional[str] = Field(index=True, default=None, max_length=45)
-    uuid: Optional[str] = Field(index=True, default=None, max_length=30)
-    domain: Optional[str] = Field(index=True, default=None, max_length=60)
-
-    def order(self):
-        return {
-            "id": self.id, 
-            "name": self.name, 
-            "description": self.description, 
-            "category": self.category, 
-            "version": self.version, 
-            "modloader": self.modloader, 
-            "moddownload": self.moddownload, 
-            "active": self.is_active, 
-            "compatible": self.is_compatible,
-            "modconditions": self.modconditions, 
-            "icon": self.icon, 
-            "color": self.color, 
-            "port": self.port, 
-            "emoji": self.emoji,
-            "uuid": self.uuid, 
-            "domain": self.domain
-        }
+    emoji: str = Field(index=True, max_length=45)
+    uuid: str = Field(index=True, max_length=8)
+    domain: str = Field(index=True, max_length=60)
 
 
-class ServerCategory(SQLModel, table=True):
+class Server(ServerBase, table=True):
+    __tablename__ = "servers"
+    id: Optional[int] = Field(primary_key=True, index=True, default=None)
+
+    category_id: Optional[int] = Field(..., sa_column=sa.Column(sa.Integer, sa.ForeignKey("server_categories.id", ondelete="SET NULL")))
+    category: Optional["ServerCategory"] = Relationship(back_populates="servers")
+
+    port: int = Field(index=True)
+
+
+class ServerPublic(SQLModel):
+    id: int
+    name: str
+    display_name: str
+    description: str
+    category_id: int
+    version: str
+    modloader: str
+    modlist: Optional[str]
+    moddownload: Optional[str]
+    modconditions: Optional[str]
+    is_active: bool
+    is_compatible: bool
+    icon: Optional[str]
+    color: Optional[str]
+    emoji: str
+    domain: str
+
+
+class ServerPublicSingle(SQLModel):
+    id: int
+    name: str
+    display_name: str
+    description: str
+    category_id: int
+    version: str
+    modloader: str
+    modlist: Optional[str]
+    moddownload: Optional[str]
+    modconditions: Optional[str]
+    is_active: bool
+    is_compatible: bool
+    icon: Optional[str]
+    color: Optional[str]
+    emoji: str
+    uuid: str
+    domain: str
+    is_running: bool
+
+
+class ServerCreate(ServerBase):
+    name: str
+    display_name: str
+    description: str
+    category_id: int
+    version: str
+    modloader: str
+    modlist: Optional[str]
+    moddownload: Optional[str]
+    modconditions: Optional[str]
+    is_active: bool
+    is_compatible: bool
+    icon: Optional[str]
+    color: Optional[str]
+    port: int
+    emoji: str
+    uuid: str
+    domain: str
+
+
+class ServerUpdate(ServerBase):
+    name: Optional[str] = None
+    display_name: str = None
+    description: Optional[str] = None
+    category_id: Optional[int] = None
+    version: Optional[str] = None
+    modloader: Optional[str] = None
+    modlist: Optional[str] = None
+    moddownload: Optional[str] = None
+    modconditions: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_compatible: Optional[bool] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    port: Optional[int] = None
+    emoji: Optional[str] = None
+    uuid: Optional[str] = None
+    domain: Optional[str] = None
+
+
+class FilterServer(SQLModel):
+    name: Optional[str] = None
+    display_name: Optional[str] = None
+    category_id: Optional[int] = None
+    version: Optional[str] = None
+    modloader: Optional[str] = None
+    is_active: Optional[bool] = None
+    is_compatible: Optional[bool] = None
+    order_by: Optional[Literal["id", "name", "display_name", "category_id", "version", "modloader", "is_active", "is_compatible"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+
+
+# ServerCategory
+class ServerCategoryBase(SQLModel):
+    name: str = Field(index=True, max_length=25)
+    icon: Optional[str] = Field(index=True, default=None, max_length=45)
+    color: Optional[str] = Field(index=True, default=None, max_length=25)
+    is_minecraft: bool = Field(index=True)
+
+
+class ServerCategory(ServerCategoryBase, table=True):
     __tablename__ = "server_categories"
-    id: int = Field(primary_key=True, index=True)
-    name: Optional[str] = Field(index=True, default=None, max_length=25)
-    icon: Optional[str] = Field(index=True, default=None, max_length=45)
-    color: Optional[str] = Field(index=True, default=None, max_length=25)
-    is_minecraft: Optional[bool] = Field(index=True, default=None)
+    id: Optional[int] = Field(primary_key=True, index=True, default=None)
 
-    def order(self):
-        return {
-            "id": self.id, 
-            "name": self.name, 
-            "icon": self.icon, 
-            "color": self.color, 
-            "is_minecraft": self.is_minecraft
-        }
+    servers: Optional[list["Server"]] = Relationship(back_populates="category")
+
+
+class ServerCategoryPublic(SQLModel):
+    id: int
+    name: str
+    icon: Optional[str]
+    color: Optional[str]
+    is_minecraft: bool
+
+
+class ServerCategoryCreate(ServerCategoryBase):
+    pass
+
+
+class ServerCategoryUpdate(ServerCategoryBase):
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_minecraft: Optional[bool] = None
+
+
+class FilterServerCategory(SQLModel):
+    name: Optional[str] = None
+    is_minecraft: Optional[bool] = None
+    order_by: Optional[Literal["id", "name", "is_minecraft"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"

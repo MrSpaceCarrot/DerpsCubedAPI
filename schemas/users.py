@@ -1,5 +1,5 @@
 # Module Imports
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Literal
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 
@@ -59,8 +59,6 @@ class UserPublic(SQLModel):
     display_name: Optional[str]
     display_name_last_changed: Optional[datetime]
     can_use_site: Optional[bool]
-    can_add_games: Optional[bool]
-    permissions: Optional[list["Permission"]]
 
 
 class UserPublicShort(SQLModel):
@@ -74,3 +72,13 @@ class UserCreate(SQLModel):
 
 class UserUpdate(SQLModel):
     display_name: Optional[str]
+
+
+class FilterUser(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    discord_id: Optional[str] = None
+    username: Optional[str] = None
+    can_use_site: Optional[bool] = None
+    order_by: Optional[Literal["id", "username", "first_site_login", "last_site_login", "display_name"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"

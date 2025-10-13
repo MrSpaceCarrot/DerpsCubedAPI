@@ -1,10 +1,10 @@
 # Module Imports
 import logging
 import validators
-from typing import TYPE_CHECKING, Optional, List
+from typing import TYPE_CHECKING, Optional, List, Literal
 from typing_extensions import Self
 from datetime import datetime
-from sqlmodel import SQLModel, Field, Relationship, Session, select
+from sqlmodel import SQLModel, Field, Relationship
 import sqlalchemy as sa
 from pydantic import field_validator, model_validator
 from config import settings
@@ -132,11 +132,28 @@ class GameUpdate(GameBase):
     update_banner_link: Optional[bool] = None
 
 
+class FilterGame(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    name: Optional[str] = None
+    platform: Optional[str] = None
+    added_by_id: Optional[int] = None
+    order_by: Optional[Literal["id", "name", "platform", "min_party_size", "max_party_size", "last_updated", "date_added", "average_rating", "popularity_score", "random"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+
+
 # GameTag
 class GameTag(SQLModel, table=True):
     __tablename__ = "game_tags"
     id: int = Field(primary_key=True, index=True)
     name: str = Field(index=True, default=None, max_length=50)
+
+
+class FilterGameTag(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 100
+    order_by: Optional[Literal["id", "name"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
 
 
 # GameRating
@@ -171,3 +188,13 @@ class GameRatingUpdate(SQLModel):
         if value and (value < -1 or value > 10):
             raise ValueError("Rating must be between 1 and 10, 0 for unrated, -1 for ignored")
         return value
+
+
+class FilterGameRating(SQLModel):
+    page: Optional[int] = 1
+    per_page: Optional[int] = 50
+    game_id: Optional[int] = None
+    user_id: Optional[int] = None
+    rating: Optional[int] = None
+    order_by: Optional[Literal["id", "game_id", "user_id", "rating"]] = "id"
+    order_dir: Optional[Literal["asc", "desc"]] = "asc"
