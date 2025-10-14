@@ -4,6 +4,7 @@ import random
 from typing import Tuple
 from datetime import datetime, timezone
 from sqlmodel import Session, select
+from scipy.stats import truncnorm
 from schemas.database import engine
 from schemas.economy import Currency, UserCurrency
 from schemas.users import User
@@ -78,6 +79,27 @@ def calculate_blackjack_hand_value(hand: list) -> int:
         else:
             break
     return hand_value
+
+
+# Exchange Rates
+# Generate a random exchange rate using normal distribution
+def generate_exchange_rate() -> float:
+        mean = 1
+        low = 0.9
+        high = 1.1
+        std = 0.04
+        a, b = (low - mean) / std, (high - mean) / std
+        return truncnorm.rvs(a, b, loc=mean, scale=std)
+
+# Randomize exchange rates
+def randomize_exchange_rates() -> None:
+    with Session(engine) as session:
+        db_currencies = session.exec(select(Currency)).all()
+        for currency in db_currencies:
+            currency.exchange_rate = generate_exchange_rate() * currency.value_multiplier
+            session.add(currency)
+        session.commit()
+        logger.info(f"Randomized exchange rates for {len(db_currencies)} currencies")
             
 # Misc
 # Ensure a datetime object has utc information

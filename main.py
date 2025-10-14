@@ -10,6 +10,7 @@ from apscheduler.triggers.cron import CronTrigger
 from routers import auth, economy, games, servers, users
 from config import settings, log_config
 from schemas.database import setup_database
+from services.economy import randomize_exchange_rates
 from services.storage import *
 from services.games import *
 
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
     create_bucket()
     if settings.APP_RUN_SCHEDULED_TASKS == True:
         scheduler.start()
+        scheduler.add_job(randomize_exchange_rates, trigger=CronTrigger(minute='0,15,30,45'), id='randomize_exchange_rates')
         scheduler.add_job(update_last_updated_all, trigger=CronTrigger(minute='0,15,30,45'), id='update_last_updated_all')
         scheduler.add_job(three_hourly_maintanence, trigger=CronTrigger(hour='0,3,6,9,12,15,18,21'), id='three_hourly_maintanence')
     yield
