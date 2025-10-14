@@ -2,6 +2,7 @@
 import sqlalchemy as sa
 from typing import Optional, Literal
 from sqlmodel import SQLModel, Field, Relationship
+from fastapi_filter.contrib.sqlalchemy import Filter
 
 
 # Schemas
@@ -115,7 +116,7 @@ class ServerUpdate(ServerBase):
     domain: Optional[str] = None
 
 
-class FilterServer(SQLModel):
+class ServerFilter(Filter):
     name: Optional[str] = None
     display_name: Optional[str] = None
     category_id: Optional[int] = None
@@ -123,8 +124,10 @@ class FilterServer(SQLModel):
     modloader: Optional[str] = None
     is_active: Optional[bool] = None
     is_compatible: Optional[bool] = None
-    order_by: Optional[Literal["id", "name", "display_name", "category_id", "version", "modloader", "is_active", "is_compatible"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = Server
 
 
 # ServerCategory
@@ -161,8 +164,9 @@ class ServerCategoryUpdate(ServerCategoryBase):
     is_minecraft: Optional[bool] = None
 
 
-class FilterServerCategory(SQLModel):
-    name: Optional[str] = None
+class ServerCategoryFilter(Filter):
     is_minecraft: Optional[bool] = None
-    order_by: Optional[Literal["id", "name", "is_minecraft"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = ServerCategory

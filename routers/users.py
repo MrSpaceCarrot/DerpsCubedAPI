@@ -1,22 +1,25 @@
 # Module Imports
 import logging
-from typing import Annotated
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlmodel import Session, select
 from auth.security import require_permission, Authenticator
-from schemas.database import get_session, apply_filters
+from schemas.database import get_session
 from schemas.users import *
 
 router = APIRouter()
 logger = logging.getLogger("services")
 
 # Get users
-@router.get("", tags=["users"], response_model=list[UserPublic], dependencies=[Depends(require_permission("can_view_users"))])
-def get_users(filters: FilterUser = Depends(), session: Session = Depends(get_session)):
+@router.get("", tags=["users"], dependencies=[Depends(require_permission("can_view_users"))])
+def get_users(filter: UserFilter = FilterDepends(UserFilter), session: Session = Depends(get_session)) -> Page[User]:
     query = select(User)
-    query = apply_filters(query, User, filters)
-    return session.exec(query).all()
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Create user
 @router.post("/create", tags=["users"], response_model=UserPublic, dependencies=[Depends(require_permission("can_manage_users"))], status_code=201)

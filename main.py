@@ -3,6 +3,7 @@ import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi_pagination import add_pagination
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -36,6 +37,7 @@ app = FastAPI(title=settings.APP_TITLE,
               summary=settings.APP_SUMMARY,
               version=settings.APP_VERSION,
               lifespan=lifespan)
+add_pagination(app)
 
 # Add CORS middleware
 app.add_middleware(

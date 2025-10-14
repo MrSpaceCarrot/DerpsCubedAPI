@@ -3,6 +3,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, List, Literal
 from sqlmodel import SQLModel, Float, Field, Relationship
+from fastapi_filter.contrib.sqlalchemy import Filter
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.ext.mutable import MutableList
@@ -60,14 +61,14 @@ class CurrencyPublicShort(SQLModel):
     prefix: Optional[str]
 
 
-class FilterCurrency(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class CurrencyFilter(Filter):
     can_gamble: Optional[bool] = None
     can_exchange: Optional[bool] = None
     can_work_for: Optional[bool] = None
-    order_by: Optional[Literal["id", "name", "display_name"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = Currency
 
 
 # UserCurrency
@@ -96,13 +97,13 @@ class UserCurrencyLeaderboard(SQLModel):
     user_currencies: Optional[list[UserCurrencyPublic]]
 
 
-class FilterUserCurrency(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class UserCurrencyFilter(Filter):
     user_id: Optional[int] = None
     currency_id: Optional[int] = None
-    order_by: Optional[Literal["id", "user_id", "currency_id"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = UserCurrency
 
 
 # Job
@@ -131,11 +132,11 @@ class JobPublic(SQLModel):
     overridden_currency_id: Optional[int]
 
 
-class FilterJob(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
-    order_by: Optional[Literal["id", "name", "display_name", "min_pay", "max_pay", "cooldown"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+class JobFilter(Filter):
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = Job
 
 
 # UserJob
@@ -160,14 +161,14 @@ class UserJobPublic(SQLModel):
     currency: CurrencyPublic
 
 
-class FilterUserJob(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class UserJobFilter(Filter):
     user_id: Optional[int] = None
     job_id: Optional[int] = None
     currency: Optional[int] = None
-    order_by: Optional[Literal["id", "user_id", "job_id", "currency_id"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = UserJob
 
 
 # Cooldown

@@ -1,11 +1,14 @@
 # Module Imports
+import json
 import logging
 import validators
-from typing import TYPE_CHECKING, Optional, List, Literal
+from typing import TYPE_CHECKING, Optional, List
 from typing_extensions import Self
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+from fastapi_filter.contrib.sqlalchemy import Filter
 import sqlalchemy as sa
+from sqlalchemy import or_, func
 from pydantic import field_validator, model_validator
 from config import settings
 
@@ -132,14 +135,40 @@ class GameUpdate(GameBase):
     update_banner_link: Optional[bool] = None
 
 
-class FilterGame(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class GameFilter(Filter):
     name: Optional[str] = None
+    name__like: Optional[str] = None
     platform: Optional[str] = None
+    platform__in: Optional[list[str]] = None
+    platform__not_in: Optional[list[str]] = None
+    min_party_size__gte: Optional[int] = None
+    max_party_size__lte: Optional[int] = None
+    tags__in: Optional[list[str]] = None
+    last_updated__isnull: Optional[bool] = None
     added_by_id: Optional[int] = None
-    order_by: Optional[Literal["id", "name", "platform", "min_party_size", "max_party_size", "last_updated", "date_added", "average_rating", "popularity_score", "random"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    average_rating__gte: Optional[float] = None
+    popularity_score__gte: Optional[float] = None
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = Game
+
+    def filter(self, query):
+        # Save tags so that they don't get written incorrectly to the query
+        tags = self.tags__in
+        self.tags__in = None
+
+        # Apply filters
+        query = super().filter(query)
+
+        # Filter tags
+        if tags:
+            conditions = [func.JSON_CONTAINS(Game.tags, json.dumps(tag)) for tag in tags]
+            query = query.where(or_(*conditions))
+
+        # Return query
+        self.tags__in = tags
+        return query
 
 
 # GameTag
@@ -149,11 +178,11 @@ class GameTag(SQLModel, table=True):
     name: str = Field(index=True, default=None, max_length=50)
 
 
-class FilterGameTag(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 100
-    order_by: Optional[Literal["id", "name"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+class GameTagFilter(Filter):
+    order_by: Optional[list[str]] = ["name"]
+
+    class Constants(Filter.Constants):
+        model = GameTag
 
 
 # GameRating
@@ -190,11 +219,11 @@ class GameRatingUpdate(SQLModel):
         return value
 
 
-class FilterGameRating(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class GameRatingFilter(Filter):
     game_id: Optional[int] = None
     user_id: Optional[int] = None
     rating: Optional[int] = None
-    order_by: Optional[Literal["id", "game_id", "user_id", "rating"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = GameRating

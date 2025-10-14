@@ -2,10 +2,13 @@
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import require_permission
-from schemas.database import get_session, apply_filters
+from schemas.database import get_session
 from schemas.games import *
 from schemas.users import User
 from services.games import *
@@ -16,32 +19,44 @@ router = APIRouter()
 logger = logging.getLogger("services")
 
 # Get games
-@router.get("", tags=["games"], response_model=list[GamePublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_games(filters: FilterGame = Depends(), session: Session = Depends(get_session)):
+@router.get("", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
+def get_games(filter: GameFilter = FilterDepends(GameFilter), session: Session = Depends(get_session)) -> Page[GamePublic]:
     query = select(Game)
-    query = apply_filters(query, Game, filters)
-    return session.exec(query)
-    
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
+
+# Get random games
+@router.get("/random", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
+def get_random_games(session: Session = Depends(get_session)) -> Page[GamePublic]:
+    query = select(Game)
+    query = query.order_by(func.rand())
+    return paginate(session, query)
+
 # Get game tags
-@router.get("/tags", tags=["games"], response_model=list[GameTag], dependencies=[Depends(require_permission("can_view_games"))])
-def get_game_tags(filters: FilterGameTag = Depends(), session: Session = Depends(get_session)):
+@router.get("/tags", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
+def get_game_tags(filter: GameTagFilter = FilterDepends(GameTagFilter), session: Session = Depends(get_session)) -> Page[GameTag]:
     query = select(GameTag)
-    query = apply_filters(query, GameTag, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Get game ratings
-@router.get("/ratings", tags=["games"], response_model=list[GameRatingPublic], dependencies=[Depends(require_permission("can_view_games"))])
-def get_game_ratings(filters: FilterGameRating = Depends(), session: Session = Depends(get_session)):
+@router.get("/ratings", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
+def get_game_ratings(filter: GameRatingFilter = FilterDepends(GameRatingFilter), session: Session = Depends(get_session)) -> Page[GameRating]:
     query = select(GameRating)
-    query = apply_filters(query, GameRating, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Get current user's ratings
-@router.get("/ratings/me", tags=["games"], response_model=list[GameRatingPublic])
-def get_current_user_game_ratings(filters: FilterGameRating = Depends(), current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)):
-    query = select(GameRating).where(GameRating.user_id == current_user.id)
-    query = apply_filters(query, GameRating, filters)
-    return session.exec(query)
+@router.get("/ratings/me", tags=["games"])
+def get_current_user_game_ratings(filter: GameRatingFilter = FilterDepends(GameRatingFilter), current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)) -> Page[GameRating]:
+    query = select(GameRating)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    query = query.where(GameRating.user_id == current_user.id)
+    return paginate(session, query)
 
 # Update game rating
 @router.post("/ratings/update", tags=["games"], response_model=GameRatingPublic)

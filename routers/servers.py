@@ -3,12 +3,14 @@ import logging
 import requests
 from typing import Union
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlmodel import Session, select
 from auth.security import require_permission
 from config import settings
-from schemas.database import get_session, apply_filters
+from schemas.database import get_session
 from schemas.servers import *
-from schemas.users import User
 from services.servers import check_server_running
 
 
@@ -16,18 +18,20 @@ router = APIRouter()
 logger = logging.getLogger("services")
 
 # Get servers
-@router.get("/", tags=["servers"], response_model=list[ServerPublic], dependencies=[Depends(require_permission("can_view_servers"))])
-def get_servers(filters: FilterServer = Depends(), session: Session = Depends(get_session)) -> list[Server]:
+@router.get("/", tags=["servers"], dependencies=[Depends(require_permission("can_view_servers"))])
+def get_servers(filter: ServerFilter = FilterDepends(ServerFilter), session: Session = Depends(get_session)) -> Page[ServerPublic]:
     query = select(Server)
-    query = apply_filters(query, Server, filters)
-    return session.exec(query).all()
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
     
 # Get server categories
-@router.get("/categories", tags=["servers"], response_model=list[ServerCategoryPublic], dependencies=[Depends(require_permission("can_view_servers"))])
-def get_server_categories(filters: FilterServerCategory = Depends(), session: Session = Depends(get_session)) -> list[ServerCategory]:
+@router.get("/categories", tags=["servers"], dependencies=[Depends(require_permission("can_view_servers"))])
+def get_server_categories(filter: ServerCategoryFilter = FilterDepends(ServerCategoryFilter), session: Session = Depends(get_session)) -> Page[ServerCategoryPublic]:
     query = select(ServerCategory)
-    query = apply_filters(query, ServerCategory, filters)
-    return session.exec(query).all()
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Add server category
 @router.post("/categories/add/", tags=["servers"], response_model=ServerCategoryPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=201)

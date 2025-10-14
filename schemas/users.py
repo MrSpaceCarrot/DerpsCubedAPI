@@ -1,7 +1,8 @@
 # Module Imports
-from typing import TYPE_CHECKING, Optional, List, Literal
+from typing import TYPE_CHECKING, Optional, List
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+from fastapi_filter.contrib.sqlalchemy import Filter
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
@@ -74,11 +75,11 @@ class UserUpdate(SQLModel):
     display_name: Optional[str]
 
 
-class FilterUser(SQLModel):
-    page: Optional[int] = 1
-    per_page: Optional[int] = 50
+class UserFilter(Filter):
     discord_id: Optional[str] = None
     username: Optional[str] = None
     can_use_site: Optional[bool] = None
-    order_by: Optional[Literal["id", "username", "first_site_login", "last_site_login", "display_name"]] = "id"
-    order_dir: Optional[Literal["asc", "desc"]] = "asc"
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = User

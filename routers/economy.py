@@ -4,10 +4,13 @@ import random
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi_filter import FilterDepends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import require_permission
-from schemas.database import get_session, apply_filters
+from schemas.database import get_session
 from schemas.economy import *
 from schemas.users import User
 from services.economy import ensure_aware, add_cards_to_hand, calculate_blackjack_hand_value
@@ -16,11 +19,12 @@ from services.users import get_or_create_user
 router = APIRouter()
 
 # Get currencies
-@router.get("/currencies", tags=["economy"], response_model=list[CurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
-def get_currencies(filters: FilterCurrency = Depends(), session: Session = Depends(get_session)):
+@router.get("/currencies", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
+def get_currencies(filter: CurrencyFilter = FilterDepends(CurrencyFilter), session: Session = Depends(get_session)) -> Page[CurrencyPublic]:
     query = select(Currency)
-    query = apply_filters(query, Currency, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Exchange currency
 @router.post("/currencies/exchange", tags=["economy"])
@@ -67,27 +71,21 @@ def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = 
     return f"Converted {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"
     
 # Get balances
-@router.get("/balances", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
-def get_balances(filters: FilterUserCurrency = Depends(), session: Session = Depends(get_session)):
+@router.get("/balances", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
+def get_balances(filter: UserCurrencyFilter = FilterDepends(UserCurrencyFilter), session: Session = Depends(get_session)) -> Page[UserCurrencyPublic]:
     query = select(UserCurrency)
-    query = apply_filters(query, UserCurrency, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Get current user's balances
-@router.get("/balances/me", tags=["economy"], response_model=list[UserCurrencyPublic])
-def get_current_user_balances(filters: FilterUserCurrency = Depends(), current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
-    query = select(UserCurrency).where(UserCurrency.user_id == current_user.id)
-    query = apply_filters(query, UserCurrency, filters)
-    return session.exec(query)
-
-# Get leaderboard for a given currency
-@router.get("/balances/leaderboard/{id}", tags=["economy"], response_model=UserCurrencyLeaderboard, dependencies=[Depends(require_permission("can_use_economy"))])
-def get_balances_leaderboard(currency_id: int, session: Session = Depends(get_session)):
-    db_currency = session.exec(select(Currency).where(Currency.id == currency_id)).first()
-    if not db_currency:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
-    db_user_currencies = session.exec(select(UserCurrency).where(UserCurrency.currency_id == currency_id).order_by(UserCurrency.balance.desc())).all()
-    return UserCurrencyLeaderboard(currency=db_currency, user_currencies=db_user_currencies)
+@router.get("/balances/me", tags=["economy"])
+def get_current_user_balances(filter: UserCurrencyFilter = FilterDepends(UserCurrencyFilter), current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)) -> Page[UserCurrencyPublic]:
+    query = select(UserCurrency)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    query = query.where(UserCurrency.user_id == current_user.id)
+    return paginate(session, query)
 
 # Gift Currency
 @router.post("/balances/gift", tags=["economy"])
@@ -138,22 +136,24 @@ def get_user_balances(user_id: int, session: Session = Depends(get_session)):
     return session.exec(select(UserCurrency).where(UserCurrency.user_id == user_id).order_by(UserCurrency.id.asc())).all()
 
 # Get jobs
-@router.get("/jobs", tags=["economy"], response_model=list[JobPublic], dependencies=[Depends(require_permission("can_use_economy"))])
-def get_jobs(filters: FilterJob = Depends(), session: Session = Depends(get_session)):
+@router.get("/jobs", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
+def get_jobs(filter: JobFilter = FilterDepends(JobFilter), session: Session = Depends(get_session)) -> Page[JobPublic]:
     query = select(Job)
-    query = apply_filters(query, Job, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Get user jobs
-@router.get("/jobs/users", tags=["economy"], response_model=list[UserJobPublic], dependencies=[Depends(require_permission("can_use_economy"))])
-def get_user_jobs(filters: FilterUserJob = Depends(), session: Session = Depends(get_session)):
+@router.get("/jobs/users", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
+def get_user_jobs(filter: UserJobFilter = FilterDepends(UserJobFilter), session: Session = Depends(get_session)) -> Page[UserJobPublic]:
     query = select(UserJob)
-    query = apply_filters(query, UserJob, filters)
-    return session.exec(query)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    return paginate(session, query)
 
 # Get current user's job
 @router.get("/jobs/me", tags=["economy"], response_model=Optional[UserJobPublic])
-def get_current_user_job(filters: FilterJob = Depends(), current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
+def get_current_user_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     return session.exec(select(UserJob).where(UserJob.user_id == current_user.id)).first()
 
 # Apply for job
