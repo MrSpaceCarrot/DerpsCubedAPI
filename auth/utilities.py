@@ -16,7 +16,7 @@ logger = logging.getLogger("services")
 
 # Get Discord access token from access code
 def get_discord_access_token(access_code: str):
-    token_url = settings.DISCORD_ACCESS_TOKEN_URL
+    token_url = "https://discord.com/api/oauth2/token"
     data = {
         "client_id": settings.DISCORD_CLIENT_ID,
         "client_secret": settings.DISCORD_CLIENT_SECRET,
@@ -29,16 +29,25 @@ def get_discord_access_token(access_code: str):
     response = requests.post(token_url, data=data, headers=headers)
     
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Error getting access token")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error getting access token")
     return response.json().get('access_token')
 
 # Get discord user information
 def get_discord_user_info(access_token: str):
     headers = {'Authorization': f"Bearer {access_token}"}
-    response = requests.get(settings.DISCORD_USERINFO_URL, headers=headers)
+    response = requests.get("https://discord.com/api/v10/users/@me", headers=headers)
 
     if response.status_code != 200:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Error getting user information")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error getting user information")
+    return response.json()
+
+# Get discord user servers
+def get_discord_user_servers(access_token: str):
+    headers = {'Authorization': f"Bearer {access_token}"}
+    response = requests.get("https://discord.com/api/v10/users/@me/guilds", headers=headers)
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error getting user servers")
     return response.json()
 
 # Create JWT token

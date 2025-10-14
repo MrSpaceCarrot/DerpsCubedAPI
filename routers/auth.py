@@ -46,8 +46,14 @@ def discord_callback(code: str | None = None, session: Session = Depends(get_ses
         user.display_name = user_info["username"]
         user.can_use_site = False
         
-        # Check if user is in whitelisted discord servers
-        # TO DO
+        # If the user is a member of certain discord servers, instantly activate their account
+        whitelisted_server = False
+        for server in get_discord_user_servers(access_token):
+            if server["id"] in settings.DISCORD_SERVER_WHITELIST:
+                whitelisted_server = True
+                break
+        if whitelisted_server:
+            user.can_use_site = True
 
     # Update some fields every time a user logs in
     user.username = user_info["username"]

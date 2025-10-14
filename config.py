@@ -39,8 +39,7 @@ class Settings(BaseSettings):
     DISCORD_CLIENT_SECRET: str
     DISCORD_AUTHORIZE_URL: str
     DISCORD_REDIRECT_URL: str
-    DISCORD_ACCESS_TOKEN_URL: str
-    DISCORD_USERINFO_URL: str
+    DISCORD_SERVER_WHITELIST: list[str]
 
     # Pterodactyl Panel Settings
     PTERODACTYL_DOMAIN: str
