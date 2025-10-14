@@ -2,7 +2,7 @@
 import logging
 from sqlmodel import Session, select
 from schemas.database import engine
-from schemas.users import User, UserPermission
+from schemas.users import User, Permission, UserPermission
 from services.economy import populate_user_currencies
 
 
@@ -25,19 +25,10 @@ def get_or_create_user(discord_id: str) -> User:
 # Set default permissions for a user
 def set_default_user_permissions(user: User) -> None:
     with Session(engine) as session:
-        """
-        By default the user should have the following permissions:
-         - can_use_economy: 1
-         - can_view_games: 2
-         - can_add_games: 3
-         - can_add_ratings: 4
-         - can_view_servers: 5
-         - can_view_users: 6
-         - can_start_servers: 10
-        """
-
-        for permission_id in [1, 2, 3, 4, 5, 6, 10]:
-            session.add(UserPermission(user_id=user.id, permission_id=permission_id))
+        db_permissions = session.exec(select(Permission)).all()
+        for permission in db_permissions:
+            if permission.assigned_by_default == True:
+                session.add(UserPermission(user_id=user.id, permission_id=permission.id))
         session.commit()
 
 # Set default user permisions for all existing users

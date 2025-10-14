@@ -139,15 +139,15 @@ def get_game(id: int, session: Session = Depends(get_session)):
 
 # Edit game
 @router.patch("/{id}", tags=["games"], response_model=GamePublic, status_code=200)
-def edit_game(id: int, game: GameUpdate, current_user: User =  Depends(require_permission("can_add_games")), session: Session = Depends(get_session)):
+def edit_game(id: int, game: GameUpdate, current_user: User =  Depends(require_permission("can_manage_games")), session: Session = Depends(get_session)):
     # Ensure game exists
     db_game = session.get(Game, id)
     if not db_game:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Game not found")
     
     # Check if the current user was the one that added the game
-    if db_game.added_by_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot edit a game you did not add")
+    #if db_game.added_by_id != current_user.id:
+    #    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot edit a game you did not add")
     
     # Get updates provided by user
     game_updates = game.model_dump(exclude_unset=True)

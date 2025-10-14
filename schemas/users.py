@@ -23,6 +23,7 @@ class Permission(SQLModel, table=True):
     id: Optional[int] = Field(primary_key=True, index=True)
     code: str = Field(index=True, max_length=30)
     description: str = Field(index=True, max_length=100)
+    assigned_by_default: bool = Field(index=True)
 
     users: Optional[list["User"]] = Relationship(back_populates="permissions", link_model=UserPermission)
 

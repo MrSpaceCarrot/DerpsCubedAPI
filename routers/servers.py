@@ -173,7 +173,7 @@ def edit_server(id: Union[int, str], server: ServerUpdate, session: Session = De
     return db_server
 
 # Delete server
-@router.delete("/{id}/", tags=["servers"], dependencies=[Depends(require_permission("can_manage_servers"))], status_code=204)
+@router.delete("/{id}/", tags=["servers"], dependencies=[Depends(require_permission("can_delete_servers"))], status_code=204)
 def delete_server(id: Union[int, str], session: Session = Depends(get_session)):
     # Check that the server exists
     db_server = session.get(Server, id)
