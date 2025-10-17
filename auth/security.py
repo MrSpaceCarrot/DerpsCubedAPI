@@ -55,6 +55,8 @@ class Authenticator:
                             db_user = session.exec(select(User).where(User.discord_id == act_as_user)).first()
                             if not db_user:
                                 db_user = get_or_create_user(act_as_user)
+                                if not db_user:
+                                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An invalid discord id was provided")
                         
                         # Check if user id has been provided
                         else:

@@ -95,6 +95,8 @@ def send_gift(gift: Gift, current_user: User = Depends(require_permission("can_u
     # Get target user using either discord_id or id
     if gift.discord_id:
         db_recieving_user: User = get_or_create_user(gift.discord_id)
+        if not db_recieving_user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An invalid discord id was provided for the gift recipient")
     elif gift.user_id:
         db_recieving_user: User = session.get(User, gift.user_id)
     else:
@@ -115,7 +117,7 @@ def send_gift(gift: Gift, current_user: User = Depends(require_permission("can_u
 
     # Check if enough currency
     if db_sending_user_currency.balance < gift.amount:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {db_currency.display_name} balance (have {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}, need {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f})")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {db_currency.display_name} balance (have {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}, need {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f}).")
 
     # Change balances
     db_sending_user_currency.balance -= gift.amount
@@ -125,7 +127,7 @@ def send_gift(gift: Gift, current_user: User = Depends(require_permission("can_u
     session.refresh(db_sending_user_currency, db_recieving_user_currency)
 
     # Return
-    return f"You have gifted {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f} {db_currency.display_name} to {db_recieving_user.discord_id}. Your {db_currency.display_name} balance is now {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}"
+    return f"Successfully gifted {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f} {db_currency.display_name} to {db_recieving_user.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}. <@{db_recieving_user.discord_id}>'s {db_currency.display_name} balance is now {db_currency.prefix}{db_recieving_user_currency.balance:.{db_currency.decimal_places}f}."
 
 # Get balances for a specific user
 @router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])

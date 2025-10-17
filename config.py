@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     DISCORD_AUTHORIZE_URL: str
     DISCORD_REDIRECT_URL: str
     DISCORD_SERVER_WHITELIST: list[str]
+    DISCORD_BOT_TOKEN: str
 
     # Pterodactyl Panel Settings
     PTERODACTYL_DOMAIN: str

@@ -59,6 +59,7 @@ class CurrencyPublicShort(SQLModel):
     name: str
     display_name: str
     prefix: Optional[str]
+    decimal_places: int
 
 
 class CurrencyFilter(Filter):
