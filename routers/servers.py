@@ -18,7 +18,7 @@ router = APIRouter()
 logger = logging.getLogger("services")
 
 # Get servers
-@router.get("/", tags=["servers"], dependencies=[Depends(require_permission("can_view_servers"))])
+@router.get("", tags=["servers"], dependencies=[Depends(require_permission("can_view_servers"))])
 def get_servers(filter: ServerFilter = FilterDepends(ServerFilter), session: Session = Depends(get_session)) -> Page[ServerPublic]:
     query = select(Server)
     query = filter.filter(query)
@@ -61,7 +61,7 @@ def get_server_category(id: int, session: Session = Depends(get_session)) -> Ser
     return db_category
 
 # Edit server category
-@router.patch("/categories/{id}/", tags=["servers"], response_model=ServerCategoryPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=200)
+@router.patch("/categories/{id}", tags=["servers"], response_model=ServerCategoryPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=200)
 def edit_server_category(id: int, category: ServerCategoryUpdate, session: Session = Depends(get_session)):
     # Check that the category exists
     db_category = session.get(ServerCategory, id)
@@ -98,7 +98,7 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
 
     # Check if the server is already running
     if check_server_running(db_server) == True:
-        raise HTTPException(status_code=400, detail=f"Server '{db_server.display_name}' is already online")
+        raise HTTPException(status_code=400, detail=f"Server is already online")
 
     # Start server
     url: str = f"{settings.PTERODACTYL_DOMAIN}/api/client/servers/{db_server.uuid}/power"
@@ -113,7 +113,7 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
         raise HTTPException(status_code=500, detail=f"An error occured starting server '{db_server.display_name}'")
 
 # Add server
-@router.post("/add/", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=201)
+@router.post("/add", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=201)
 def add_server(server: ServerCreate, session: Session = Depends(get_session)):
     # Create server instance using validated user data
     db_server = Server(**server.model_dump())
@@ -130,7 +130,7 @@ def add_server(server: ServerCreate, session: Session = Depends(get_session)):
     return db_server
 
 # Get server
-@router.get("/{id}/", tags=["servers"], response_model=ServerPublicSingle, dependencies=[Depends(require_permission("can_view_servers"))])
+@router.get("/{id}", tags=["servers"], response_model=ServerPublicSingle, dependencies=[Depends(require_permission("can_view_servers"))])
 def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> Server:
     # Check that the server exists
     db_server = session.get(Server, id)
@@ -146,7 +146,7 @@ def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> 
     return server_response
 
 # Edit server
-@router.patch("/{id}/", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=200)
+@router.patch("/{id}", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=200)
 def edit_server(id: Union[int, str], server: ServerUpdate, session: Session = Depends(get_session)):
     # Check that the server exists
     db_server = session.get(Server, id)
@@ -173,7 +173,7 @@ def edit_server(id: Union[int, str], server: ServerUpdate, session: Session = De
     return db_server
 
 # Delete server
-@router.delete("/{id}/", tags=["servers"], dependencies=[Depends(require_permission("can_delete_servers"))], status_code=204)
+@router.delete("/{id}", tags=["servers"], dependencies=[Depends(require_permission("can_delete_servers"))], status_code=204)
 def delete_server(id: Union[int, str], session: Session = Depends(get_session)):
     # Check that the server exists
     db_server = session.get(Server, id)

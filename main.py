@@ -39,7 +39,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title=settings.APP_TITLE, 
               summary=settings.APP_SUMMARY,
               version=settings.APP_VERSION,
-              lifespan=lifespan)
+              lifespan=lifespan,
+              redirect_slashes=False)
 add_pagination(app)
 
 # Add CORS middleware
