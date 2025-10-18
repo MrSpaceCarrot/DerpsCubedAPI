@@ -185,15 +185,43 @@ class Cooldown(SQLModel, table=True):
 
 
 # Currency Exchange
-class CurrencyExchange(SQLModel):
-    currency_from_id: int
-    currency_to_id: int
-    amount: float
+class CurrencyExchange(SQLModel, table=True):
+    __tablename__ = "currency_exchanges"
+    id: Optional[int] = Field(primary_key=True, index=True)
+    code: str = Field(index=True, max_length=36)
+
+    user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
+    user: "User" = Relationship(back_populates="currency_exchanges")
+
+    currency_from_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="SET NULL")))
+    currency_from: "Currency" = Relationship(sa_relationship_kwargs={"foreign_keys": "[CurrencyExchange.currency_from_id]"})
+    currency_from_amount: float = Field(sa_column=sa.Column(Float()))
+
+    currency_to_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="SET NULL")))
+    currency_to: "Currency" = Relationship(sa_relationship_kwargs={"foreign_keys": "[CurrencyExchange.currency_to_id]"})
+    currency_to_amount: float = Field(sa_column=sa.Column(Float()))
+
+    relative_exchange_rate: float = Field(index=True)
+    result: Optional[str] = Field(index=True, max_length=15)
+    
+
+class CurrencyExchangeUpdate(SQLModel):
+    currency_from_id: Optional[int] = None
+    currency_to_id: Optional[int] = None
+    amount: Optional[float] = None
+    code: Optional[str] = None
+    action: Optional[str] = None
 
     @field_validator("amount")
     def validate_amount(cls, value: float) -> float:
-        if value < 0:
+        if value and value < 0:
             raise ValueError("Amount must be greater than 0")
+        return value
+    
+    @field_validator("action")
+    def validate_action(cls, value: str) -> float:
+        if value and value not in ["Confirm", "Cancel"]:
+            raise ValueError("Action must either be 'Confirm' or 'Cancel'")
         return value
 
 

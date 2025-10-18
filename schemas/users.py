@@ -6,7 +6,7 @@ from fastapi_filter.contrib.sqlalchemy import Filter
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
-    from schemas.economy import UserCurrency, UserJob, Cooldown, BlackjackGame
+    from schemas.economy import UserCurrency, UserJob, Cooldown, BlackjackGame, CurrencyExchange
     from schemas.games import Game, GameRating
 
 
@@ -49,6 +49,7 @@ class User(SQLModel, table=True):
     cooldowns: Optional[list["Cooldown"]] = Relationship(back_populates="user")
     blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="user")
     permissions: Optional[List["Permission"]] = Relationship(back_populates="users", link_model=UserPermission)
+    currency_exchanges: Optional[List["CurrencyExchange"]] = Relationship(back_populates="user")
 
 
 class UserPublic(SQLModel):

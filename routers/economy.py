@@ -28,47 +28,107 @@ def get_currencies(filter: CurrencyFilter = FilterDepends(CurrencyFilter), sessi
 
 # Exchange currency
 @router.post("/currencies/exchange", tags=["economy"])
-def exchange_currency(currency_exchange: CurrencyExchange, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
+def exchange_currency(currency_exchange: CurrencyExchangeUpdate, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
-    # Validate currency from
-    currency_from: Currency = session.get(Currency, currency_exchange.currency_from_id)
-    if not currency_from:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency from not found")
-    if not currency_from.can_exchange:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
 
-    # Validate currency to
-    currency_to: Currency = session.get(Currency, currency_exchange.currency_to_id)
-    if not currency_to:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency to not found")
-    if not currency_to.can_exchange:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange to {currency_to.display_name}")
+    # Get details from request
+    currency_exchange: CurrencyExchangeUpdate = CurrencyExchangeUpdate(**currency_exchange.model_dump())
     
-    # Ensure both currencies are not the same
-    if currency_from == currency_to:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot convert {currency_from.display_name} into {currency_to.display_name}")
+    # If exchange code was not given
+    if currency_exchange.code == None:
+        # Validate currency from
+        currency_from: Currency = session.get(Currency, currency_exchange.currency_from_id)
+        if not currency_from:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency from not found")
+        if not currency_from.can_exchange:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
+        if not currency_exchange.amount:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Amount must be provided")
+
+        # Validate currency to
+        currency_to: Currency = session.get(Currency, currency_exchange.currency_to_id)
+        if not currency_to:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency to not found")
+        if not currency_to.can_exchange:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange to {currency_to.display_name}")
     
-    # Get user balances
-    user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_from.id)).first()
-    user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_to.id)).first()
+        # Ensure both currencies are not the same
+        if currency_from == currency_to:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot convert {currency_from.display_name} into {currency_to.display_name}")
 
-    # Check that user has enough balance of given currency
-    if user_currency_from.balance < currency_exchange.amount:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {currency_from.display_name} balance (have {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}, need {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f})")
+        # Get user balances
+        user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_from.id)).first()
+        user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_to.id)).first()
 
-    # Calculate exchange rate between currencies
-    relative_rate: float = currency_from.exchange_rate / currency_to.exchange_rate
-    currency_to_amount_gained: float = currency_exchange.amount * relative_rate
+        # Check that user has enough balance of given currency
+        if user_currency_from.balance < currency_exchange.amount:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {currency_from.display_name} balance (have {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}, need {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f})")
 
-    # Update user balances
-    user_currency_from.balance -= currency_exchange.amount
-    user_currency_to.balance += currency_to_amount_gained
-    session.add(user_currency_from, user_currency_to)
-    session.commit()
-    session.refresh(user_currency_from, user_currency_to)
+        # Calculate exchange rate between currencies
+        relative_rate: float = currency_from.exchange_rate / currency_to.exchange_rate
+        currency_to_amount_gained: float = currency_exchange.amount * relative_rate
 
-    # Return
-    return f"Converted {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"
+        # Create CurrencyExchange
+        db_currency_exchange = CurrencyExchange(code=str(uuid.uuid4()),
+                                                user_id=current_user.id,
+                                                currency_from_id=currency_from.id,
+                                                currency_from_amount=currency_exchange.amount,
+                                                currency_to_id=currency_to.id,
+                                                currency_to_amount=currency_to_amount_gained,
+                                                relative_exchange_rate=relative_rate)
+        return_text = f"You are about to convert {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} {currency_from.display_name} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f} {currency_to.display_name}. {currency_from.prefix}1 {currency_from.display_name} is currently worth {currency_to.prefix}{relative_rate:.4f} {currency_to.display_name}. Are you sure you want to do this?"
+        
+        # Return
+        session.add(db_currency_exchange)
+        session.commit()
+        return {"code": db_currency_exchange.code, "return_text": return_text}
+
+    # If exchange code was given (confirming exchange)
+    else:
+        # Verify CurrencyExchange
+        db_currency_exchange = session.exec(select(CurrencyExchange).where(CurrencyExchange.code == currency_exchange.code)).first()
+        if not db_currency_exchange:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency exchange code is invalid")
+        
+        # Verify that the exchange has not already finished
+        if db_currency_exchange.result:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This currency exchange has already finished")
+
+        # Verify that an action was given
+        if not currency_exchange.action:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action must either be 'Confirm' or 'Cancel'")
+        
+        # Update user balances if action was confirmed
+        if currency_exchange.action == "Confirm":
+            # Get user balances
+            user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_from_id)).first()
+            user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_to_id)).first()
+
+            # Update user balances
+            user_currency_from.balance -= db_currency_exchange.currency_from_amount
+            user_currency_to.balance += db_currency_exchange.currency_to_amount
+            session.add(user_currency_from, user_currency_to)
+            session.commit()
+            session.refresh(user_currency_from, user_currency_to)
+
+            # Update CurrencyExchange
+            currency_from = user_currency_from.currency
+            currency_from_amount = db_currency_exchange.currency_from_amount
+            currency_to = user_currency_to.currency
+            currency_to_amount = db_currency_exchange.currency_to_amount
+
+            db_currency_exchange.result = "Confirmation"
+            action = "Confirmation"
+            return_text = f"Converted {currency_from.prefix}{currency_from_amount:.{currency_from.decimal_places}f} {currency_from.display_name} to {currency_to.prefix}{currency_to_amount:.{currency_to.decimal_places}f} {currency_to.display_name}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}."
+        else:
+            db_currency_exchange.result = "Cancellation"
+            action = "Cancellation"
+            return_text = "Transaction Cancelled"
+
+        # Return
+        session.add(db_currency_exchange)
+        session.commit()
+        return {"return_text": return_text, "action": action}
     
 # Get balances
 @router.get("/balances", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
@@ -154,10 +214,24 @@ def get_user_jobs(filter: UserJobFilter = FilterDepends(UserJobFilter), session:
     return paginate(session, query)
 
 # Get current user's job
-@router.get("/jobs/me", tags=["economy"], response_model=Optional[UserJobPublic])
+@router.get("/jobs/me", tags=["economy"], response_model=UserJobPublic)
 def get_current_user_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
-    return session.exec(select(UserJob).where(UserJob.user_id == current_user.id)).first()
+    current_user: User = session.merge(current_user)
 
+    db_user_job = session.exec(select(UserJob).where(UserJob.user_id == current_user.id)).first()
+
+    # If job exists, return it
+    if db_user_job:
+        return db_user_job
+    
+    # If job does not exist, return a cooldown for when the user can apply for another one
+    else:
+        for cooldown in current_user.cooldowns:
+            if cooldown.cooldown_type == "job_change" and ensure_aware(cooldown.expires) > datetime.now(timezone.utc):
+                expires_in = ensure_aware(cooldown.expires) - datetime.now(timezone.utc)
+                raise HTTPException(status_code=status.HTTP_200_OK, detail=f"You do not currently have a job. You can apply for another job in {expires_in.seconds}s")
+        raise HTTPException(status_code=status.HTTP_200_OK, detail="You do not currently have a job")
+    
 # Apply for job
 @router.post("/jobs/apply", tags=["economy"], response_model=Optional[UserJobPublic])
 def apply_for_job(current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
@@ -209,7 +283,7 @@ def quit_job(current_user: User = Depends(require_permission("can_use_economy"))
     old_job_name = current_user.job.job.display_name
     session.delete(current_user.job)
     session.commit()
-    return f"You quit your previous job of {old_job_name}. You can apply for another job in 300s"
+    return {"detail": f"You quit your previous job of {old_job_name}. You can apply for another job in 300s"}
 
 # Work Job
 @router.post("/jobs/work", tags=["economy"])
@@ -255,7 +329,7 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
     blackjack_game_update: BlackjackGameUpdate = BlackjackGameUpdate(**blackjack_game_update.model_dump())
 
     # If game code was not given (game is just starting)
-    if not blackjack_game_update.code:
+    if blackjack_game_update.code == None:
         # Check that the currency is valid
         db_currency: Currency = session.get(Currency, blackjack_game_update.currency_id)
         if not db_currency:
@@ -303,6 +377,9 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
         if blackjack_game_update.action == "Stand":
             while calculate_blackjack_hand_value(db_blackjack_game.dealer_hand) < 17:
                 db_blackjack_game.dealer_hand = add_cards_to_hand(db_blackjack_game.dealer_hand, 1)
+
+        # Get bet currency
+        db_currency = db_blackjack_game.currency
         
     # Determine if the game has finished
     user_hand_value = calculate_blackjack_hand_value(db_blackjack_game.user_hand)
@@ -334,23 +411,22 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
 
     # If the game ended, set result and update balances
     if game_outcome != None:
-        currency = db_blackjack_game.currency
         db_user_currency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_blackjack_game.currency_id)).first()
         db_blackjack_game.result = game_outcome
         
         if game_outcome == "Win":
-            db_blackjack_game.result_text = f"You won {currency.prefix}{db_blackjack_game.bet:.{currency.decimal_places}f} {currency.display_name}. Your {currency.display_name} balance is now {currency.prefix}{(db_user_currency.balance + db_blackjack_game.bet):.{currency.decimal_places}f}"
+            db_blackjack_game.result_text = f"You won {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance + db_blackjack_game.bet):.{db_currency.decimal_places}f}"
         elif game_outcome == "Lose":
-            db_blackjack_game.result_text = f"You lost {currency.prefix}{db_blackjack_game.bet:.{currency.decimal_places}f} {currency.display_name}. Your {currency.display_name} balance is now {currency.prefix}{(db_user_currency.balance - db_blackjack_game.bet):.{currency.decimal_places}f}"
+            db_blackjack_game.result_text = f"You lost {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance - db_blackjack_game.bet):.{db_currency.decimal_places}f}"
         else:
-            db_blackjack_game.result_text = f"You were refunded {currency.prefix}{db_blackjack_game.bet:.{currency.decimal_places}f} {currency.display_name}. Your {currency.display_name} balance is {currency.prefix}{db_user_currency.balance:.{currency.decimal_places}f}"
+            db_blackjack_game.result_text = f"You were refunded {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}"
 
         # Update balances
         for user_currency in current_user.balances:
             if user_currency.id == 1:
                 user_currency.balance += 10
                 session.add(user_currency)
-            if user_currency.id == currency.id:
+            if user_currency.id == db_currency.id:
                 if game_outcome == "Win":
                     user_currency.balance += db_blackjack_game.bet
                 elif game_outcome == "Lose":
