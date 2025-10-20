@@ -37,6 +37,7 @@ class Currency(SQLModel, table=True):
     jobs: Optional[list["Job"]] = Relationship(back_populates="overridden_currency")
     user_jobs: Optional[list["UserJob"]] = Relationship(back_populates="currency")
     blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="currency")
+    transactions: Optional[list["Transaction"]] = Relationship(back_populates="currency")
 
 
 class CurrencyPublic(SQLModel):
@@ -104,6 +105,7 @@ class UserCurrencyUpdate(SQLModel):
     currency_id: int
     mode: Literal["Add", "Subtract", "Set"]
     amount: float
+    note: str
 
 
 class UserCurrencyFilter(Filter):
@@ -113,6 +115,40 @@ class UserCurrencyFilter(Filter):
 
     class Constants(Filter.Constants):
         model = UserCurrency
+
+
+# Transaction
+class Transaction(SQLModel, table=True):
+    __tablename__ = "transactions"
+    id: Optional[int] = Field(primary_key=True, index=True)
+
+    user_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("users.id", ondelete="CASCADE")))
+    user: "User" = Relationship(back_populates="transactions")
+
+    currency_id: int = Field(sa_column=sa.Column(sa.Integer, sa.ForeignKey("currencies.id", ondelete="CASCADE")))
+    currency: "Currency" = Relationship(back_populates="transactions")
+
+    amount: float = Field(sa_column=sa.Column(Float()))
+    timestamp: datetime = Field(index=True)
+    note: str = Field(index=True, max_length=75)
+
+
+class TransactionPublic(SQLModel):
+    id: int
+    user: UserPublicShort
+    currency: CurrencyPublicShort
+    amount: float
+    timestamp: datetime
+    note: str
+
+
+class TransactionFilter(Filter):
+    user_id: Optional[int] = None
+    currency_id: Optional[int] = None
+    order_by: Optional[list[str]] = ["id"]
+
+    class Constants(Filter.Constants):
+        model = Transaction
 
 
 # Job

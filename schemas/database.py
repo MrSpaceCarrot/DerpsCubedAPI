@@ -5,7 +5,7 @@ from config import settings
 from sqlmodel import SQLModel, create_engine, Session
 from sqlalchemy import func
 from schemas.auth import ApiKey, RefreshToken
-from schemas.economy import Currency, UserCurrency, Job, UserJob, Cooldown, BlackjackGame
+from schemas.economy import Currency, UserCurrency, Job, UserJob, Cooldown, BlackjackGame, Transaction, CurrencyExchange
 from schemas.games import Game, GameTag, GameRating
 from schemas.servers import Server, ServerCategory
 from schemas.users import User, Permission, UserPermission

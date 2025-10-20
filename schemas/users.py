@@ -6,7 +6,7 @@ from fastapi_filter.contrib.sqlalchemy import Filter
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
-    from schemas.economy import UserCurrency, UserJob, Cooldown, BlackjackGame, CurrencyExchange
+    from schemas.economy import UserCurrency, UserJob, Cooldown, BlackjackGame, CurrencyExchange, Transaction
     from schemas.games import Game, GameRating
 
 
@@ -50,6 +50,7 @@ class User(SQLModel, table=True):
     blackjack_games: Optional[list["BlackjackGame"]] = Relationship(back_populates="user")
     permissions: Optional[List["Permission"]] = Relationship(back_populates="users", link_model=UserPermission)
     currency_exchanges: Optional[List["CurrencyExchange"]] = Relationship(back_populates="user")
+    transactions: Optional[List["Transaction"]] = Relationship(back_populates="user")
 
 
 class UserPublic(SQLModel):
@@ -67,6 +68,7 @@ class UserPublic(SQLModel):
 class UserPublicShort(SQLModel):
     id: int
     discord_id: str
+    username: str
 
 
 class UserCreate(SQLModel):

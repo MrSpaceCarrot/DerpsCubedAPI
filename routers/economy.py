@@ -138,6 +138,12 @@ def continue_currency_exchange(currency_exchange: CurrencyExchangeContinue, curr
         db_currency_exchange.result = "Confirmation"
         action = "Confirmation"
         response_text: list = [f"Converted {currency_from.prefix}{currency_from_amount:.{currency_from.decimal_places}f} {currency_from.display_name} to {currency_to.prefix}{currency_to_amount:.{currency_to.decimal_places}f} {currency_to.display_name}", f"Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}", f"Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"]
+    
+        # Create transactions
+        db_transaction_from = Transaction(user_id=current_user.id, currency_id=currency_from.id, amount=-db_currency_exchange.currency_from_amount, timestamp=datetime.now(timezone.utc), note="Currency exchange")
+        db_transaction_to = Transaction(user_id=current_user.id, currency_id=currency_to.id, amount=db_currency_exchange.currency_to_amount, timestamp=datetime.now(timezone.utc), note="Currency exchange")
+        session.add(db_transaction_from)
+        session.add(db_transaction_to)
     else:
         db_currency_exchange.result = "Cancellation"
         action = "Cancellation"
@@ -183,16 +189,21 @@ def modify_user_balance(user_currency_update: UserCurrencyUpdate, session: Sessi
     if not db_currency:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
     
-    # Update user currency
+    # Update user currency, create transaction
     db_user_currency = session.exec(select(UserCurrency).where(UserCurrency.user_id == db_user.id, UserCurrency.currency_id == db_currency.id)).first()
     match user_currency_update.mode:
         case "Add":
             db_user_currency.balance += user_currency_update.amount
+            db_transaction = Transaction(user_id=db_user.id, currency_id=db_currency.id, amount=user_currency_update.amount, timestamp=datetime.now(timezone.utc), note=user_currency_update.note)
         case "Subtract":
             db_user_currency.balance -= user_currency_update.amount
+            db_transaction = Transaction(user_id=db_user.id, currency_id=db_currency.id, amount=-user_currency_update.amount, timestamp=datetime.now(timezone.utc), note=user_currency_update.note)
         case "Set":
             db_user_currency.balance = user_currency_update.amount
+            transaction_amount = -(db_user_currency.balance - user_currency_update.amount)
+            db_transaction = Transaction(user_id=db_user.id, currency_id=db_currency.id, amount=transaction_amount, timestamp=datetime.now(timezone.utc), note=user_currency_update.note)
     session.add(db_user_currency)
+    session.add(db_transaction)
     session.commit()
     session.refresh(db_user_currency)
     return db_user_currency
@@ -233,11 +244,27 @@ def send_gift(gift: Gift, current_user: User = Depends(require_permission("can_u
     db_sending_user_currency.balance -= gift.amount
     db_recieving_user_currency.balance += gift.amount
     session.add(db_sending_user_currency, db_recieving_user_currency)
+
+    # Create transactions
+    db_transaction_sending = Transaction(user_id=current_user.id, currency_id=gift.currency_id, amount=-gift.amount, timestamp=datetime.now(timezone.utc), note=f"Sent gift to {db_recieving_user.display_name}")
+    db_transaction_recieving = Transaction(user_id=db_recieving_user.id, currency_id=gift.currency_id, amount=gift.amount, timestamp=datetime.now(timezone.utc), note=f"Received gift from {current_user.display_name}")
+    session.add(db_transaction_sending)
+    session.add(db_transaction_recieving)
+
     session.commit()
     session.refresh(db_sending_user_currency, db_recieving_user_currency)
 
     # Return
     return f"Successfully gifted {db_currency.prefix}{gift.amount:.{db_currency.decimal_places}f} {db_currency.display_name} to {db_recieving_user.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{db_sending_user_currency.balance:.{db_currency.decimal_places}f}. <@{db_recieving_user.discord_id}>'s {db_currency.display_name} balance is now {db_currency.prefix}{db_recieving_user_currency.balance:.{db_currency.decimal_places}f}."
+
+# Get current user's transactions
+@router.get("/transactions/me", tags=["economy"])
+def get_current_user_transactions(filter: TransactionFilter = FilterDepends(TransactionFilter), current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)) -> Page[TransactionPublic]:
+    query = select(Transaction)
+    query = filter.filter(query)
+    query = filter.sort(query)
+    query = query.where(Transaction.user_id == current_user.id)
+    return paginate(session, query)
 
 # Get balances for a specific user
 @router.get("/balances/{user_id}", tags=["economy"], response_model=list[UserCurrencyPublic], dependencies=[Depends(require_permission("can_use_economy"))])
@@ -357,6 +384,10 @@ def work_job(current_user: User = Depends(require_permission("can_use_economy"))
     balance.balance = balance.balance + pay_amount
     session.add(balance)
 
+    # Create transaction
+    db_transaction = Transaction(user_id=current_user.id, currency_id=current_user.job.currency_id, amount=pay_amount, timestamp=datetime.now(timezone.utc), note=f"Paycheck for working as a {current_user.job.job.display_name}")
+    session.add(db_transaction)
+
     # Create cooldown
     work_cooldown: Cooldown = Cooldown(user_id=current_user.id, expires=datetime.now(timezone.utc) + timedelta(seconds=current_user.job.job.cooldown), cooldown_type="work")
     session.add(work_cooldown)
@@ -449,10 +480,13 @@ def blackjack(request_blackjack_game: Union[BlackjackGameStart, BlackjackGameCon
     db_blackjack_game.user_hand_value = user_hand_value
     db_blackjack_game.dealer_hand_value = dealer_hand_value
 
+    logger.info(user_hand_value)
+    logger.info(dealer_hand_value)
+
     game_outcome = None
 
     if user_hand_value > 21:
-            game_outcome = "Lose"
+        game_outcome = "Lose"
     elif user_hand_value == 21:
         if dealer_hand_value == 21:
             game_outcome = "Tie"
@@ -463,13 +497,14 @@ def blackjack(request_blackjack_game: Union[BlackjackGameStart, BlackjackGameCon
             game_outcome = "Win"
         elif dealer_hand_value == 21:
             game_outcome = "Lose"
-        if type(request_blackjack_game) == BlackjackGameContinue:
-            if dealer_hand_value > user_hand_value and blackjack_game.action == "Stand":
-                game_outcome = "Lose"
-            elif user_hand_value > dealer_hand_value and blackjack_game.action == "Stand" and dealer_hand_value >= 17:
-                game_outcome = "Win"
-            elif user_hand_value == dealer_hand_value and blackjack_game.action == "Stand":
-                game_outcome = "Tie"
+        else:
+            if type(request_blackjack_game) == BlackjackGameContinue:
+                if dealer_hand_value > user_hand_value and blackjack_game.action == "Stand":
+                    game_outcome = "Lose"
+                elif user_hand_value > dealer_hand_value and blackjack_game.action == "Stand" and dealer_hand_value >= 17:
+                    game_outcome = "Win"
+                elif user_hand_value == dealer_hand_value and blackjack_game.action == "Stand":
+                    game_outcome = "Tie"
 
     # If the game ended, set result and update balances
     if game_outcome != None:
@@ -483,16 +518,22 @@ def blackjack(request_blackjack_game: Union[BlackjackGameStart, BlackjackGameCon
         else:
             response_text = [f"You were refunded {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}", f"Your {db_currency.display_name} balance is {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}"]
 
-        # Update balances
+        # Update balances, create transactions
         for user_currency in current_user.balances:
             if user_currency.id == 1:
                 user_currency.balance += 10
                 session.add(user_currency)
+
             if user_currency.id == db_currency.id:
                 if game_outcome == "Win":
                     user_currency.balance += db_blackjack_game.bet
+                    db_transaction = Transaction(user_id=current_user.id, currency_id=db_blackjack_game.currency_id, amount=db_blackjack_game.bet, timestamp=datetime.now(timezone.utc), note="Blackjack win")
+                    session.add(db_transaction)
+                
                 elif game_outcome == "Lose":
                     user_currency.balance -= db_blackjack_game.bet
+                    db_transaction = Transaction(user_id=current_user.id, currency_id=db_blackjack_game.currency_id, amount=-db_blackjack_game.bet, timestamp=datetime.now(timezone.utc), note="Blackjack loss")
+                    session.add(db_transaction)
                 session.add(user_currency)
     else:
         response_text = None
