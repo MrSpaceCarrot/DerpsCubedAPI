@@ -385,7 +385,7 @@ def work_job(current_user: User = Depends(require_permission("can_use_economy"))
     session.add(balance)
 
     # Create transaction
-    db_transaction = Transaction(user_id=current_user.id, currency_id=current_user.job.currency_id, amount=pay_amount, timestamp=datetime.now(timezone.utc), note=f"Paycheck for working as a {current_user.job.job.display_name}")
+    db_transaction = Transaction(user_id=current_user.id, currency_id=current_user.job.currency_id, amount=pay_amount, timestamp=datetime.now(timezone.utc), note=f"{current_user.job.job.display_name} paycheck")
     session.add(db_transaction)
 
     # Create cooldown
