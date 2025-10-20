@@ -16,6 +16,8 @@ class ApiKey(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id")
     user: "User" = Relationship(back_populates="api_keys")
 
+    can_act_as_user: bool = Field(default=False)
+
 
 class RefreshToken(SQLModel, table=True):
     __tablename__ = "refresh_tokens"

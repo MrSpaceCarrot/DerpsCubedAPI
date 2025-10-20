@@ -1,6 +1,7 @@
 # Module imports
 from logging.config import dictConfig
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import logging
 
 
 class Settings(BaseSettings):
@@ -62,14 +63,37 @@ class Settings(BaseSettings):
 settings = Settings()
 
 # Logging
+# Define ANSI escape sequences for colors
+LOG_COLORS = {
+    logging.DEBUG: "\033[94m",    # Blue
+    logging.INFO: "\033[92m",     # Green
+    logging.WARNING: "\033[93m",  # Yellow
+    logging.ERROR: "\033[91m",    # Red
+    logging.CRITICAL: "\033[31m", # Maroon
+}
+
+RESET_COLOR = "\033[0m"
+
+# Custom Formatter to colorize [levelname]
+class ColorFormatter(logging.Formatter):
+    def format(self, record):
+        # Get color from dictionary
+        log_color: str = LOG_COLORS.get(record.levelno, RESET_COLOR)
+
+        # Apply and return formatting
+        record.levelname = f"{log_color}[{record.levelname}]{RESET_COLOR}"
+        return super().format(record)
+
+# Log config
 log_config = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '[{asctime}] [{levelname}] [{name}]: {message}',
-            'style': '{',
+            '()': ColorFormatter,
+            'fmt': '\033[90m{asctime} \033[34m{levelname} \x1b[38;5;98m[{name}]\033[97m: {message}\033[0m',
             'datefmt': '%Y-%m-%d %H:%M:%S',
+            'style': '{',
         },
     },
     'handlers': {
@@ -99,11 +123,6 @@ log_config = {
             'propagate': False,
         },
         'uvicorn': {
-            'handlers': ['console', 'logfile'],
-            'level': settings.LOG_LEVEL_UVICORN,
-            'propagate': False,
-        },
-        'uvicorn.error': {
             'handlers': ['console', 'logfile'],
             'level': settings.LOG_LEVEL_UVICORN,
             'propagate': False,

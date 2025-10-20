@@ -480,9 +480,6 @@ def blackjack(request_blackjack_game: Union[BlackjackGameStart, BlackjackGameCon
     db_blackjack_game.user_hand_value = user_hand_value
     db_blackjack_game.dealer_hand_value = dealer_hand_value
 
-    logger.info(user_hand_value)
-    logger.info(dealer_hand_value)
-
     game_outcome = None
 
     if user_hand_value > 21:

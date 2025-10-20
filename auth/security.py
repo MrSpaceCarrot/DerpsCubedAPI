@@ -50,6 +50,10 @@ class Authenticator:
                 if db_api_key:
                     # Check if API Key is acting on behalf of a user
                     if act_as_user:
+                        # Check if api key is allowed to use this header
+                        if not db_api_key.can_act_as_user:
+                            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This api key cannot act as other users")
+
                         # Check if discord id has been provided
                         if len(act_as_user) > 7:
                             db_user = session.exec(select(User).where(User.discord_id == act_as_user)).first()

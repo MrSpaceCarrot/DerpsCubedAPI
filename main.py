@@ -52,16 +52,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Request time taken
-"""
-@app.middleware("http")
-async def add_process_time_header(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    logger.info(f"Time taken: {round(float((time.time() - start_time) * 1000), 2)} ms")
-    return response
-"""
-
 # Setup static
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
