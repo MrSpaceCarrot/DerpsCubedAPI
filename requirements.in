@@ -6,6 +6,7 @@ argon2-cffi
 argon2-cffi-bindings
 asttokens
 Authlib
+beanie
 boto3
 boto3-stubs
 botocore
@@ -24,6 +25,8 @@ executing
 fastapi
 fastapi-cli
 fastapi-cloud-cli
+fastapi-filter
+fastapi-pagination
 greenlet
 h11
 httpcore
@@ -35,16 +38,20 @@ ipython_pygments_lexers
 jedi
 Jinja2
 jmespath
+lazy-model
 Mako
 markdown-it-py
 MarkupSafe
 matplotlib-inline
 mdurl
+mongoengine
+motor
 mypy-boto3-cloudformation
 mypy-boto3-dynamodb
 mypy-boto3-ec2
 mypy-boto3-s3
 mysql-connector-python
+numpy
 packaging
 parso
 pillow
@@ -57,6 +64,7 @@ pydantic-settings
 pydantic_core
 Pygments
 PyJWT
+pymongo
 pyproject_hooks
 python-dateutil
 python-dotenv
@@ -67,6 +75,7 @@ rich
 rich-toolkit
 rignore
 s3transfer
+scipy
 sentry-sdk
 shellingham
 six
@@ -75,6 +84,7 @@ SQLAlchemy
 sqlmodel
 stack-data
 starlette
+toml
 traitlets
 typer
 types-awscrt

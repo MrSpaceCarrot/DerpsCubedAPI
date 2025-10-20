@@ -2,7 +2,7 @@
 import uuid
 import random
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Union
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi_filter import FilterDepends
 from fastapi_pagination import Page
@@ -26,109 +26,127 @@ def get_currencies(filter: CurrencyFilter = FilterDepends(CurrencyFilter), sessi
     query = filter.sort(query)
     return paginate(session, query)
 
-# Exchange currency
-@router.post("/currencies/exchange", tags=["economy"])
-def exchange_currency(currency_exchange: CurrencyExchangeUpdate, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
+# Start currency exchange
+@router.post("/currencies/exchange/start", tags=["economy"])
+def start_currency_exchange(currency_exchange: CurrencyExchangeStart, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
 
     # Get details from request
-    currency_exchange: CurrencyExchangeUpdate = CurrencyExchangeUpdate(**currency_exchange.model_dump())
-    
-    # If exchange code was not given
-    if currency_exchange.code == None:
-        # Validate currency from
-        currency_from: Currency = session.get(Currency, currency_exchange.currency_from_id)
-        if not currency_from:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency from not found")
-        if not currency_from.can_exchange:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
-        if not currency_exchange.amount:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Amount must be provided")
+    currency_exchange: CurrencyExchangeStart = CurrencyExchangeStart(**currency_exchange.model_dump())
 
-        # Validate currency to
-        currency_to: Currency = session.get(Currency, currency_exchange.currency_to_id)
-        if not currency_to:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency to not found")
-        if not currency_to.can_exchange:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange to {currency_to.display_name}")
-    
-        # Ensure both currencies are not the same
-        if currency_from == currency_to:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot convert {currency_from.display_name} into {currency_to.display_name}")
+    # Check that the user does not have any unfinished exchanges
+    db_unexpired_exchange = session.exec(select(CurrencyExchange).where(CurrencyExchange.user_id == current_user.id).where(CurrencyExchange.result == None)).first()
+    if db_unexpired_exchange and datetime.now(timezone.utc) < ensure_aware(db_unexpired_exchange.expires):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have an active currency exchange that has not been confirmed, canceled, or expired")
 
+    # Load given currencies
+    db_currencies = session.exec(select(Currency)).all()
+    
+    currency_from: Currency = None
+    currency_to: Currency = None
+    for currency in db_currencies:
+        if currency.id == currency_exchange.currency_from_id:
+            currency_from = currency
+        if currency.id == currency_exchange.currency_to_id:
+            currency_to = currency
+
+    # Validate currency from
+    if not currency_from:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency from not found")
+    if not currency_from.can_exchange:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange {currency_from.display_name}")
+    
+    # Validate currency to
+    if not currency_to:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency to not found")
+    if not currency_to.can_exchange:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot exchange to {currency_to.display_name}")
+    
+    # Ensure both currencies are not the same
+    if currency_from == currency_to:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"You cannot convert {currency_from.display_name} into {currency_to.display_name}")
+    
+    # Get user balance
+    user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_from.id)).first()
+
+    # Check that user has enough balance of given currency
+    if user_currency_from.balance < currency_exchange.amount:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {currency_from.display_name} balance (have {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}, need {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f})")
+
+    # Calculate exchange rate between currencies
+    relative_rate: float = currency_from.exchange_rate / currency_to.exchange_rate
+    currency_to_amount_gained: float = currency_exchange.amount * relative_rate
+
+    # Create CurrencyExchange
+    code = str(uuid.uuid4())
+    expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+    db_currency_exchange = CurrencyExchange(code=code,
+                                            user_id=current_user.id,
+                                            currency_from_id=currency_from.id,
+                                            currency_from_amount=currency_exchange.amount,
+                                            currency_to_id=currency_to.id,
+                                            currency_to_amount=currency_to_amount_gained,
+                                            relative_exchange_rate=relative_rate,
+                                            expires=expires)
+    session.add(db_currency_exchange)
+    session.commit()
+    
+    # Create Response
+    response_text: list = [f"You are about to convert {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} {currency_from.display_name} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f} {currency_to.display_name}", f"{currency_from.prefix}1 {currency_from.display_name} is currently worth {currency_to.prefix}{relative_rate:.4f} {currency_to.display_name}", "Are you sure you want to do this?"]
+    return CurrencyExchangeStartResponse(response_text=response_text, code=code)
+
+# Continue currency exchange
+@router.post("/currencies/exchange/continue", tags=["economy"])
+def continue_currency_exchange(currency_exchange: CurrencyExchangeContinue, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
+    current_user: User = session.merge(current_user)
+
+    # Get details from request
+    currency_exchange: CurrencyExchangeContinue = CurrencyExchangeContinue(**currency_exchange.model_dump())
+    
+    # Verify CurrencyExchange
+    db_currency_exchange = session.exec(select(CurrencyExchange).where(CurrencyExchange.code == currency_exchange.code)).first()
+    if not db_currency_exchange:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency exchange code is invalid")
+
+    # Verify that the exchange has not already finished
+    if db_currency_exchange.result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This currency exchange has already finished")
+    
+    # Check that the exchange has not expired
+    if datetime.now(timezone.utc) > ensure_aware(db_currency_exchange.expires):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This currency exchange has expired")
+
+    # Update user balances if action was confirmed
+    if currency_exchange.action == "Confirm":
         # Get user balances
-        user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_from.id)).first()
-        user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == currency_to.id)).first()
+        user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_from_id)).first()
+        user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_to_id)).first()
 
-        # Check that user has enough balance of given currency
-        if user_currency_from.balance < currency_exchange.amount:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {currency_from.display_name} balance (have {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}, need {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f})")
-
-        # Calculate exchange rate between currencies
-        relative_rate: float = currency_from.exchange_rate / currency_to.exchange_rate
-        currency_to_amount_gained: float = currency_exchange.amount * relative_rate
-
-        # Create CurrencyExchange
-        db_currency_exchange = CurrencyExchange(code=str(uuid.uuid4()),
-                                                user_id=current_user.id,
-                                                currency_from_id=currency_from.id,
-                                                currency_from_amount=currency_exchange.amount,
-                                                currency_to_id=currency_to.id,
-                                                currency_to_amount=currency_to_amount_gained,
-                                                relative_exchange_rate=relative_rate)
-        return_text = f"You are about to convert {currency_from.prefix}{currency_exchange.amount:.{currency_from.decimal_places}f} {currency_from.display_name} into {currency_to.prefix}{currency_to_amount_gained:.{currency_to.decimal_places}f} {currency_to.display_name}. {currency_from.prefix}1 {currency_from.display_name} is currently worth {currency_to.prefix}{relative_rate:.4f} {currency_to.display_name}. Are you sure you want to do this?"
-        
-        # Return
-        session.add(db_currency_exchange)
+        # Update user balances
+        user_currency_from.balance -= db_currency_exchange.currency_from_amount
+        user_currency_to.balance += db_currency_exchange.currency_to_amount
+        session.add(user_currency_from, user_currency_to)
         session.commit()
-        return {"code": db_currency_exchange.code, "return_text": return_text}
+        session.refresh(user_currency_from, user_currency_to)
 
-    # If exchange code was given (confirming exchange)
+        # Update CurrencyExchange
+        currency_from = user_currency_from.currency
+        currency_from_amount = db_currency_exchange.currency_from_amount
+        currency_to = user_currency_to.currency
+        currency_to_amount = db_currency_exchange.currency_to_amount
+
+        db_currency_exchange.result = "Confirmation"
+        action = "Confirmation"
+        response_text: list = [f"Converted {currency_from.prefix}{currency_from_amount:.{currency_from.decimal_places}f} {currency_from.display_name} to {currency_to.prefix}{currency_to_amount:.{currency_to.decimal_places}f} {currency_to.display_name}", f"Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}", f"Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}"]
     else:
-        # Verify CurrencyExchange
-        db_currency_exchange = session.exec(select(CurrencyExchange).where(CurrencyExchange.code == currency_exchange.code)).first()
-        if not db_currency_exchange:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency exchange code is invalid")
-        
-        # Verify that the exchange has not already finished
-        if db_currency_exchange.result:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This currency exchange has already finished")
+        db_currency_exchange.result = "Cancellation"
+        action = "Cancellation"
+        response_text: list = ["Transaction Cancelled"]
 
-        # Verify that an action was given
-        if not currency_exchange.action:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action must either be 'Confirm' or 'Cancel'")
-        
-        # Update user balances if action was confirmed
-        if currency_exchange.action == "Confirm":
-            # Get user balances
-            user_currency_from: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_from_id)).first()
-            user_currency_to: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == db_currency_exchange.currency_to_id)).first()
-
-            # Update user balances
-            user_currency_from.balance -= db_currency_exchange.currency_from_amount
-            user_currency_to.balance += db_currency_exchange.currency_to_amount
-            session.add(user_currency_from, user_currency_to)
-            session.commit()
-            session.refresh(user_currency_from, user_currency_to)
-
-            # Update CurrencyExchange
-            currency_from = user_currency_from.currency
-            currency_from_amount = db_currency_exchange.currency_from_amount
-            currency_to = user_currency_to.currency
-            currency_to_amount = db_currency_exchange.currency_to_amount
-
-            db_currency_exchange.result = "Confirmation"
-            action = "Confirmation"
-            return_text = f"Converted {currency_from.prefix}{currency_from_amount:.{currency_from.decimal_places}f} {currency_from.display_name} to {currency_to.prefix}{currency_to_amount:.{currency_to.decimal_places}f} {currency_to.display_name}. Your {currency_from.display_name} balance is now {currency_from.prefix}{user_currency_from.balance:.{currency_from.decimal_places}f}. Your {currency_to.display_name} balance is now {currency_to.prefix}{user_currency_to.balance:.{currency_to.decimal_places}f}."
-        else:
-            db_currency_exchange.result = "Cancellation"
-            action = "Cancellation"
-            return_text = "Transaction Cancelled"
-
-        # Return
-        session.add(db_currency_exchange)
-        session.commit()
-        return {"return_text": return_text, "action": action}
+    # Return
+    session.add(db_currency_exchange)
+    session.commit()
+    return CurrencyExchangeContinueResponse(response_text=response_text, action=action)
     
 # Get balances
 @router.get("/balances", tags=["economy"], dependencies=[Depends(require_permission("can_use_economy"))])
@@ -304,7 +322,7 @@ def work_job(current_user: User = Depends(require_permission("can_use_economy"))
     job: Job = current_user.job.job
     pay_amount: float = (random.randint(job.min_pay, job.max_pay)) / current_user.job.currency.value_multiplier
     balance = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == current_user.job.currency_id)).first()
-    balance.balance = pay_amount
+    balance.balance = balance.balance + pay_amount
     session.add(balance)
 
     # Create cooldown
@@ -321,17 +339,21 @@ def work_job(current_user: User = Depends(require_permission("can_use_economy"))
     return response_string
 
 # Blackjack
-@router.post("/gambling/blackjack", tags=["economy"], response_model=BlackjackGamePublic)
-def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
+@router.post("/gambling/blackjack", tags=["economy"], response_model=BlackjackGameResponse)
+def blackjack(request_blackjack_game: Union[BlackjackGameStart, BlackjackGameContinue], current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):
     current_user: User = session.merge(current_user)
 
-    # Get details from request
-    blackjack_game_update: BlackjackGameUpdate = BlackjackGameUpdate(**blackjack_game_update.model_dump())
+    # If the game is just starting
+    if type(request_blackjack_game) == BlackjackGameStart:
+        blackjack_game: BlackjackGameStart = BlackjackGameStart(**request_blackjack_game.model_dump())
 
-    # If game code was not given (game is just starting)
-    if blackjack_game_update.code == None:
+        # Check that the user does not have any unfinished games
+        db_unexpired_game = session.exec(select(BlackjackGame).where(BlackjackGame.user_id == current_user.id).where(BlackjackGame.result == None)).first()
+        if db_unexpired_game and datetime.now(timezone.utc) < ensure_aware(db_unexpired_game.expires):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have an active blackjack game that has not been finished or expired")
+
         # Check that the currency is valid
-        db_currency: Currency = session.get(Currency, blackjack_game_update.currency_id)
+        db_currency: Currency = session.get(Currency, blackjack_game.currency_id)
         if not db_currency:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
         
@@ -341,40 +363,47 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
         
         # Check that the user has enough to bet
         db_user_currency: UserCurrency = session.exec(select(UserCurrency).where(UserCurrency.id == db_currency.id)).first()
-        if db_user_currency.balance < blackjack_game_update.bet:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {db_currency.display_name} balance (have {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}, need {db_currency.prefix}{blackjack_game_update.bet:.{db_currency.decimal_places}f})")
+        if db_user_currency.balance < blackjack_game.bet:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Insufficent {db_currency.display_name} balance (have {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}, need {db_currency.prefix}{blackjack_game.bet:.{db_currency.decimal_places}f})")
 
         # Create BlackjackGame
-        db_blackjack_game = BlackjackGame(code=str(uuid.uuid4()), user_id=current_user.id, currency_id=db_currency.id, bet=blackjack_game_update.bet)
+        expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+        db_blackjack_game = BlackjackGame(code=str(uuid.uuid4()), user_id=current_user.id, currency_id=db_currency.id, bet=blackjack_game.bet, expires=expires)
 
         # Draw cards
         db_blackjack_game.user_hand = add_cards_to_hand([], 2)
         db_blackjack_game.dealer_hand = add_cards_to_hand([], 2)
 
-    # If game code was given (game is already going)
+    # If game is already ongoing
     else:
+        blackjack_game: BlackjackGameContinue = BlackjackGameContinue(**request_blackjack_game.model_dump())
+
         # Verify BlackjackGame
-        db_blackjack_game = session.exec(select(BlackjackGame).where(BlackjackGame.code == blackjack_game_update.code)).first()
+        db_blackjack_game = session.exec(select(BlackjackGame).where(BlackjackGame.code == blackjack_game.code)).first()
         if not db_blackjack_game:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blackjack game code is invalid")
         
         # Verify that the game has not already finished
         if db_blackjack_game.result:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This blackjack game has already finished")
+        
+        # Check that the exchange has not expired
+        if datetime.now(timezone.utc) > ensure_aware(db_blackjack_game.expires):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This blackjack game has expired")
 
         # Verify that an action was given
-        if not blackjack_game_update.action:
+        if not blackjack_game.action:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Action must either be 'Hit' or 'Stand'")
         
         # If user has hit, draw a card. Dealer hits only if their hand is worth less than 17
-        if blackjack_game_update.action == "Hit":
+        if blackjack_game.action == "Hit":
             db_blackjack_game.user_hand = add_cards_to_hand(db_blackjack_game.user_hand, 1)
 
             if calculate_blackjack_hand_value(db_blackjack_game.dealer_hand) < 17:
                 db_blackjack_game.dealer_hand = add_cards_to_hand(db_blackjack_game.dealer_hand, 1)
 
         # If user has stood, dealer hits until their hand value is more than or equal to 17
-        if blackjack_game_update.action == "Stand":
+        if blackjack_game.action == "Stand":
             while calculate_blackjack_hand_value(db_blackjack_game.dealer_hand) < 17:
                 db_blackjack_game.dealer_hand = add_cards_to_hand(db_blackjack_game.dealer_hand, 1)
 
@@ -402,12 +431,13 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
             game_outcome = "Win"
         elif dealer_hand_value == 21:
             game_outcome = "Lose"
-        elif dealer_hand_value > user_hand_value and blackjack_game_update.action == "Stand":
-            game_outcome = "Lose"
-        elif user_hand_value > dealer_hand_value and blackjack_game_update.action == "Stand" and dealer_hand_value >= 17:
-            game_outcome = "Win"
-        elif user_hand_value == dealer_hand_value and blackjack_game_update.action == "Stand":
-            game_outcome = "Tie"
+        if type(request_blackjack_game) == BlackjackGameContinue:
+            if dealer_hand_value > user_hand_value and blackjack_game.action == "Stand":
+                game_outcome = "Lose"
+            elif user_hand_value > dealer_hand_value and blackjack_game.action == "Stand" and dealer_hand_value >= 17:
+                game_outcome = "Win"
+            elif user_hand_value == dealer_hand_value and blackjack_game.action == "Stand":
+                game_outcome = "Tie"
 
     # If the game ended, set result and update balances
     if game_outcome != None:
@@ -415,11 +445,11 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
         db_blackjack_game.result = game_outcome
         
         if game_outcome == "Win":
-            db_blackjack_game.result_text = f"You won {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance + db_blackjack_game.bet):.{db_currency.decimal_places}f}"
+            response_text = [f"You won {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}", f"Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance + db_blackjack_game.bet):.{db_currency.decimal_places}f}"]
         elif game_outcome == "Lose":
-            db_blackjack_game.result_text = f"You lost {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance - db_blackjack_game.bet):.{db_currency.decimal_places}f}"
+            response_text = [f"You lost {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}", f"Your {db_currency.display_name} balance is now {db_currency.prefix}{(db_user_currency.balance - db_blackjack_game.bet):.{db_currency.decimal_places}f}"]
         else:
-            db_blackjack_game.result_text = f"You were refunded {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}. Your {db_currency.display_name} balance is {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}"
+            response_text = [f"You were refunded {db_currency.prefix}{db_blackjack_game.bet:.{db_currency.decimal_places}f} {db_currency.display_name}", f"Your {db_currency.display_name} balance is {db_currency.prefix}{db_user_currency.balance:.{db_currency.decimal_places}f}"]
 
         # Update balances
         for user_currency in current_user.balances:
@@ -432,17 +462,21 @@ def blackjack(blackjack_game_update: BlackjackGameUpdate, current_user: User = D
                 elif game_outcome == "Lose":
                     user_currency.balance -= db_blackjack_game.bet
                 session.add(user_currency)
+    else:
+        response_text = None
 
     # Commit game to database
     session.add(db_blackjack_game)
     session.commit()
     session.refresh(db_blackjack_game)
 
-    # Censor dealer cards if the game has not finished, return
+    # Censor dealer cards if the game has not finished
     if not game_outcome:
         db_blackjack_game.dealer_hand_value = 0
         censored_dealer_hand = [db_blackjack_game.dealer_hand[0]]
         for i in range(1, len(db_blackjack_game.dealer_hand), 1):
             censored_dealer_hand.append("[?]")
         db_blackjack_game.dealer_hand = censored_dealer_hand
-    return db_blackjack_game
+
+    # Return
+    return BlackjackGameResponse(game=db_blackjack_game, response_text=response_text)

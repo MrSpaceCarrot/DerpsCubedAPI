@@ -203,26 +203,28 @@ class CurrencyExchange(SQLModel, table=True):
 
     relative_exchange_rate: float = Field(index=True)
     result: Optional[str] = Field(index=True, max_length=15)
+    expires: datetime = Field(index=True)
     
 
-class CurrencyExchangeUpdate(SQLModel):
-    currency_from_id: Optional[int] = None
-    currency_to_id: Optional[int] = None
-    amount: Optional[float] = None
-    code: Optional[str] = None
-    action: Optional[str] = None
+class CurrencyExchangeStart(SQLModel):
+    currency_from_id: int
+    currency_to_id: int
+    amount: float = Field(gt=0)
 
-    @field_validator("amount")
-    def validate_amount(cls, value: float) -> float:
-        if value and value < 0:
-            raise ValueError("Amount must be greater than 0")
-        return value
-    
-    @field_validator("action")
-    def validate_action(cls, value: str) -> float:
-        if value and value not in ["Confirm", "Cancel"]:
-            raise ValueError("Action must either be 'Confirm' or 'Cancel'")
-        return value
+
+class CurrencyExchangeStartResponse(SQLModel):
+    response_text: list[str]
+    code: str
+
+
+class CurrencyExchangeContinue(SQLModel):
+    code: str
+    action: Literal["Confirm", "Cancel"]
+
+
+class CurrencyExchangeContinueResponse(SQLModel):
+    response_text: list[str]
+    action: str
 
 
 # Gift
@@ -258,7 +260,7 @@ class BlackjackGame(SQLModel, table=True):
 
     bet: float = Field(sa_column=sa.Column(Float()))
     result: Optional[str] = Field(index=True, max_length=4)
-    result_text: Optional[str] = Field(index=True, max_length=300)
+    expires: datetime = Field(index=True)
 
 
 class BlackjackGamePublic(SQLModel):
@@ -272,23 +274,18 @@ class BlackjackGamePublic(SQLModel):
     currency: CurrencyPublicShort
     bet: float
     result: Optional[str]
-    result_text: Optional[str]
 
 
-class BlackjackGameUpdate(SQLModel):
-    currency_id: Optional[int] = None
-    bet: Optional[float] = None
-    code: Optional[str] = None
-    action: Optional[str] = None
+class BlackjackGameStart(SQLModel):
+    currency_id: int
+    bet: float = Field(gt=0)
 
-    @field_validator("bet")
-    def validate_bet(cls, value: str) -> float:
-        if value and value < 0:
-            raise ValueError("Bet must be greater that 0'")
-        return value
 
-    @field_validator("action")
-    def validate_action(cls, value: str) -> float:
-        if value and value not in ["Hit", "Stand"]:
-            raise ValueError("Action must either be 'Hit' or 'Stand'")
-        return value
+class BlackjackGameContinue(SQLModel):
+    code: str
+    action: Literal["Hit", "Stand"]
+
+
+class BlackjackGameResponse(SQLModel):
+    game: BlackjackGamePublic
+    response_text: Optional[list[str]]
