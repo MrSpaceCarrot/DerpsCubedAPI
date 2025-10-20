@@ -74,12 +74,7 @@ click==8.3.0
     #   typer
     #   uvicorn
 colorama==0.4.6
-    # via
-    #   -r requirements.in
-    #   build
-    #   click
-    #   ipython
-    #   uvicorn
+    # via -r requirements.in
 cryptography==46.0.3
     # via
     #   -r requirements.in
@@ -210,6 +205,8 @@ parso==0.8.5
     # via
     #   -r requirements.in
     #   jedi
+pexpect==4.9.0
+    # via ipython
 pillow==12.0.0
     # via -r requirements.in
 pip-tools==7.5.1
@@ -218,6 +215,8 @@ prompt-toolkit==3.0.52
     # via
     #   -r requirements.in
     #   ipython
+ptyprocess==0.7.0
+    # via pexpect
 pure-eval==0.2.3
     # via
     #   -r requirements.in
@@ -299,7 +298,7 @@ s3transfer==0.14.0
     #   boto3
 scipy==1.16.2
     # via -r requirements.in
-sentry-sdk==2.42.0
+sentry-sdk==2.42.1
     # via
     #   -r requirements.in
     #   fastapi-cloud-cli
@@ -377,9 +376,7 @@ typing-inspection==0.4.2
     #   pydantic
     #   pydantic-settings
 tzdata==2025.2
-    # via
-    #   -r requirements.in
-    #   tzlocal
+    # via -r requirements.in
 tzlocal==5.3.1
     # via
     #   -r requirements.in
@@ -395,6 +392,8 @@ uvicorn[standard]==0.38.0
     #   -r requirements.in
     #   fastapi-cli
     #   fastapi-cloud-cli
+uvloop==0.22.1
+    # via uvicorn
 validators==0.35.0
     # via -r requirements.in
 watchfiles==1.1.1
