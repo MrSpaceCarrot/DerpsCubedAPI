@@ -165,6 +165,38 @@ def get_current_user_balances(filter: UserCurrencyFilter = FilterDepends(UserCur
     query = query.where(UserCurrency.user_id == current_user.id)
     return paginate(session, query)
 
+# Modify a user's balance for a currency
+@router.post("/balances/modify", tags=["economy"], response_model=UserCurrency, dependencies=[Depends(require_permission("can_manage_economy"))])
+def modify_user_balance(user_currency_update: UserCurrencyUpdate, session: Session = Depends(get_session)):
+    # Get target user using either discord_id or id
+    if user_currency_update.discord_id:
+        db_user: User = get_or_create_user(user_currency_update.discord_id)
+        if not db_user:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="An invalid discord id was provided for the gift recipient")
+    elif user_currency_update.user_id:
+        db_user: User = session.get(User, user_currency_update.user_id)
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either a id or discord_id of a user must be provided")
+    
+    # Validate currency
+    db_currency: Currency = session.get(Currency, user_currency_update.currency_id)
+    if not db_currency:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Currency not found")
+    
+    # Update user currency
+    db_user_currency = session.exec(select(UserCurrency).where(UserCurrency.user_id == db_user.id, UserCurrency.currency_id == db_currency.id)).first()
+    match user_currency_update.mode:
+        case "Add":
+            db_user_currency.balance += user_currency_update.amount
+        case "Subtract":
+            db_user_currency.balance -= user_currency_update.amount
+        case "Set":
+            db_user_currency.balance = user_currency_update.amount
+    session.add(db_user_currency)
+    session.commit()
+    session.refresh(db_user_currency)
+    return db_user_currency
+
 # Gift Currency
 @router.post("/balances/gift", tags=["economy"])
 def send_gift(gift: Gift, current_user: User = Depends(require_permission("can_use_economy")), session: Session = Depends(get_session)):

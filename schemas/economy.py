@@ -98,6 +98,14 @@ class UserCurrencyLeaderboard(SQLModel):
     user_currencies: Optional[list[UserCurrencyPublic]]
 
 
+class UserCurrencyUpdate(SQLModel):
+    user_id: Optional[int] = None
+    discord_id: Optional[str] = None
+    currency_id: int
+    mode: Literal["Add", "Subtract", "Set"]
+    amount: float
+
+
 class UserCurrencyFilter(Filter):
     user_id: Optional[int] = None
     currency_id: Optional[int] = None
