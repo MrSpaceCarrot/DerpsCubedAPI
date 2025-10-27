@@ -3,7 +3,7 @@ import logging
 import jwt
 from jwt import PyJWTError
 from typing import Optional
-from fastapi import HTTPException, status, Depends, Security, Header
+from fastapi import HTTPException, status, Request, Depends, Security, Header, Cookie
 from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from config import settings
@@ -24,14 +24,22 @@ act_as_user_header = Header(default=None, alias="X-Act-As-User", description="Us
 # Return the auth method and identity if successful, otherwise raise an error
 class Authenticator:
     def __call__(self,
+                 request: Request,
+                 jwt_token_cookie: str | None = Cookie(None, alias="access_token"),
                  jwt_token: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
                  api_key: Optional[str] = Security(api_key_header),
                  act_as_user: Optional[str] = act_as_user_header
     ) -> dict:
-        # Validate JWT Token
+        # Validate JWT Token (given as cookie or as httpbearer)
+        token = None
         if jwt_token:
+            token = jwt_token.credentials
+        elif jwt_token_cookie:
+            token = jwt_token_cookie
+
+        if token != None:
             try:
-                payload = decode_jwt_token(jwt_token.credentials)
+                payload = decode_jwt_token(token)
                 user_id = payload.get("sub")
                 with Session(engine) as session:
                     db_user: User = session.get(User, user_id)

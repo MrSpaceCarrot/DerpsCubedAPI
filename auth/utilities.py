@@ -15,15 +15,15 @@ from schemas.auth import RefreshToken
 logger = logging.getLogger("services")
 
 # Get Discord access token from access code
-def get_discord_access_token(access_code: str):
+def get_discord_access_token(access_code: str, redirect_url: str):
     token_url = "https://discord.com/api/oauth2/token"
     data = {
         "client_id": settings.DISCORD_CLIENT_ID,
         "client_secret": settings.DISCORD_CLIENT_SECRET,
         "grant_type": "authorization_code",
         "code": access_code,
-        "redirect_uri": settings.DISCORD_REDIRECT_URL,
-        "scope": "identify"
+        "redirect_uri": redirect_url,
+        "scope": "identify guilds"
     }
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     response = requests.post(token_url, data=data, headers=headers)
