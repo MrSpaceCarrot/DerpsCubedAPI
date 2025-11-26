@@ -2,6 +2,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 from sqlmodel import SQLModel, Field, Relationship
+from schemas.users import UserPublic
 
 if TYPE_CHECKING:
     from schemas.users import User
@@ -32,3 +33,4 @@ class Tokens(SQLModel):
     token_type: str
     expires_in: int
     refresh_token: str
+    user: UserPublic

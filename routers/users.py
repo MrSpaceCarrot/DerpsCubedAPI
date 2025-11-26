@@ -15,7 +15,7 @@ logger = logging.getLogger("services")
 
 # Get users
 @router.get("", tags=["users"], dependencies=[Depends(require_permission("can_view_users"))])
-def get_users(filter: UserFilter = FilterDepends(UserFilter), session: Session = Depends(get_session)) -> Page[User]:
+def get_users(filter: UserFilter = FilterDepends(UserFilter), session: Session = Depends(get_session)) -> Page[UserPublic]:
     query = select(User)
     query = filter.filter(query)
     query = filter.sort(query)

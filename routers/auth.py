@@ -22,7 +22,7 @@ def discord_login() -> RedirectResponse:
     return RedirectResponse(url=settings.DISCORD_AUTHORIZE_URL)
 
 # Authenticate user once they login with discord
-@router.get("/discord/callback", tags=["auth"])
+@router.get("/discord/callback", tags=["auth"], response_model=Tokens)
 def discord_callback(response: Response, code: str | None = None, redirect_url: str = settings.DISCORD_REDIRECT_URL, session: Session = Depends(get_session)):
     # Ensure access code is present
     if not code:
@@ -77,7 +77,7 @@ def discord_callback(response: Response, code: str | None = None, redirect_url: 
     session.add(db_refresh_token)
 
     # Create return model
-    tokens = Tokens(access_token=access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token)
+    tokens = Tokens(access_token=access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=user)
 
     # Set HTTP only cookies for both tokens
     response.set_cookie(
@@ -133,14 +133,18 @@ def refresh_access_token(response: Response,
     # Generate new token
     new_access_token = create_jwt_token(user_id=payload.get("sub"), issued_at=datetime.now(timezone.utc), expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
 
+    # Prepare response
+    db_user = session.get(User, user_id)
+    tokens = Tokens(access_token=new_access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user)
+
     # Set cookie and return
     response.set_cookie(
         key="access_token",
         value=new_access_token,
         httponly=True,
-        secure=True,
-        samesite="None",
+        secure=False,
+        samesite="Lax",
         max_age=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60,
     )
 
-    return Tokens(access_token=new_access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token)
+    return tokens
