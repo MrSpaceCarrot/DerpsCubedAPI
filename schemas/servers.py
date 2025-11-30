@@ -1,4 +1,5 @@
 # Module Imports
+from datetime import datetime
 import sqlalchemy as sa
 from typing import Optional, Literal
 from sqlmodel import SQLModel, Field, Relationship
@@ -35,6 +36,9 @@ class Server(ServerBase, table=True):
 
     port: int = Field(index=True)
 
+    is_running: bool = Field(index=True, default=False)
+    time_started: Optional[datetime] = Field(index=True, default=None)
+
 
 class ServerPublic(SQLModel):
     id: int
@@ -53,6 +57,8 @@ class ServerPublic(SQLModel):
     color: Optional[str]
     emoji: str
     domain: str
+    is_running: bool
+    time_started: Optional[datetime]
 
 
 class ServerPublicSingle(SQLModel):
@@ -74,6 +80,7 @@ class ServerPublicSingle(SQLModel):
     uuid: str
     domain: str
     is_running: bool
+    time_started: Optional[datetime]
 
 
 class ServerCreate(ServerBase):
@@ -125,6 +132,7 @@ class ServerFilter(Filter):
     is_active: Optional[bool] = None
     is_compatible: Optional[bool] = None
     order_by: Optional[list[str]] = ["id"]
+    is_running: Optional[bool] = None
 
     class Constants(Filter.Constants):
         model = Server

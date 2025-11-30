@@ -11,6 +11,7 @@ import schemas.users
 
 import services.economy
 import services.games
+import services.servers
 import services.storage
 import services.users
 
@@ -27,6 +28,7 @@ namespace.update(vars(schemas.users))
 
 namespace.update(vars(services.economy))
 namespace.update(vars(services.games))
+namespace.update(vars(services.servers))
 namespace.update(vars(services.storage))
 namespace.update(vars(services.users))
 

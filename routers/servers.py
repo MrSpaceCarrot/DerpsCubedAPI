@@ -11,7 +11,6 @@ from auth.security import require_permission
 from config import settings
 from schemas.database import get_session
 from schemas.servers import *
-from services.servers import check_server_running
 
 
 router = APIRouter()
@@ -97,7 +96,7 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
             raise HTTPException(status_code=404, detail="Server not found")
 
     # Check if the server is already running
-    if check_server_running(db_server) == True:
+    if db_server.is_running == True:
         raise HTTPException(status_code=400, detail=f"Server is already online")
 
     # Start server
@@ -140,7 +139,7 @@ def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> 
             raise HTTPException(status_code=404, detail="Server not found")
         
     # Add is_running information to response
-    server_response: ServerPublicSingle = ServerPublicSingle(**db_server.model_dump(), is_running = check_server_running(db_server))
+    server_response: ServerPublicSingle = ServerPublicSingle(**db_server.model_dump())
 
     # Return
     return server_response

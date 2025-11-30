@@ -5,7 +5,7 @@ import logging
 
 
 class Settings(BaseSettings):
-    # General settings
+    # General Settings
     APP_TITLE: str
     APP_SUMMARY: str
     APP_VERSION: str
@@ -19,14 +19,14 @@ class Settings(BaseSettings):
     LOG_LEVEL_APSCHEDULER: str
     LOG_LEVEL_SERVICES: str
 
-    # Database settings
+    # Database Settings
     DB_HOST: str
     DB_PORT: int
     DB_USERNAME: str
     DB_PASSWORD: str
     DB_DATABASE: str
 
-    # Minio Settings
+    # Storage Bucket Settings
     STORAGE_BUCKET_ENDPOINT: str
     STORAGE_BUCKET_ACCESS_KEY: str
     STORAGE_BUCKET_SECRET_KEY: str
@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     STORAGE_BUCKET_CACHE_TIMEOUT: int
     STORAGE_BUCKET_MEDIA_URL: str
     STORAGE_BUCKET_REGION_NAME: str
+
+    # Dockerlink Settings
+    DOCKERLINK_URL: str
+    DOCKERLINK_AUTH_KEY: str
 
     # Discord Oauth Settings
     DISCORD_CLIENT_ID: str
@@ -81,7 +85,7 @@ class ColorFormatter(logging.Formatter):
         log_color: str = LOG_COLORS.get(record.levelno, RESET_COLOR)
 
         # Apply and return formatting
-        record.levelname = f"{log_color}[{record.levelname}]{RESET_COLOR}"
+        record.colored_levelname = f"{log_color}[{record.levelname}]{RESET_COLOR}"
         return super().format(record)
 
 # Log config
@@ -89,9 +93,14 @@ log_config = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'verbose': {
+        'color': {
             '()': ColorFormatter,
-            'fmt': '\033[90m{asctime} \033[34m{levelname} \x1b[38;5;98m[{name}]\033[97m: {message}\033[0m',
+            'fmt': '\033[90m{asctime} \033[34m{colored_levelname} \x1b[38;5;98m[{name}]\033[97m: {message}\033[0m',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+            'style': '{',
+        },
+        'plain': {
+            'format': '{asctime} [{levelname}] [{name}]: {message}',
             'datefmt': '%Y-%m-%d %H:%M:%S',
             'style': '{',
         },
@@ -100,21 +109,20 @@ log_config = {
         'console': {
             'level': 'INFO',
             'class': 'logging.StreamHandler',
-            'formatter': 'verbose',
+            'formatter': 'color',
         },
         'logfile': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'logs/application.log',
             'backupCount': 5,
-            'maxBytes': 10000000,
-            'formatter': 'verbose',
+            'maxBytes': 100000,
+            'formatter': 'plain',
         },
     },
     'root': {
-        'handlers': ['console'],
+        'handlers': ['console', 'logfile'],
         'level': 'INFO',
-        'formatter': 'verbose',
     },
     'loggers': {
         'watchfiles': {

@@ -14,6 +14,7 @@ from schemas.database import setup_database
 from services.economy import randomize_exchange_rates
 from services.storage import *
 from services.games import *
+from services.servers import *
 
 # Tags metadata
 tags_metadata = [{"name": "Auth"}, {"name": "Economy"}, {"name": "Games"}, {"name": "Servers"}, {"name": "Users"}]
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
         scheduler.add_job(randomize_exchange_rates, trigger=CronTrigger(minute='0,15,30,45'), id='randomize_exchange_rates')
         scheduler.add_job(update_last_updated_all, trigger=CronTrigger(minute='0,15,30,45'), id='update_last_updated_all')
         scheduler.add_job(three_hourly_maintanence, trigger=CronTrigger(hour='0,3,6,9,12,15,18,21'), id='three_hourly_maintanence')
+        scheduler.add_job(update_server_statuses, trigger=CronTrigger(second='0'), id='update_server_statuses')
     yield
     if settings.APP_RUN_SCHEDULED_TASKS == True:
         scheduler.shutdown
