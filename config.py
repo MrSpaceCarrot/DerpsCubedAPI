@@ -116,7 +116,7 @@ log_config = {
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'logs/application.log',
             'backupCount': 5,
-            'maxBytes': 100000,
+            'maxBytes': 1000000,
             'formatter': 'plain',
         },
     },
