@@ -24,7 +24,7 @@ argon2-cffi-bindings==25.1.0
     # via
     #   -r requirements.in
     #   argon2-cffi
-asttokens==3.0.0
+asttokens==3.0.1
     # via
     #   -r requirements.in
     #   stack-data
