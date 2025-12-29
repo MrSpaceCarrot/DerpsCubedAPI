@@ -379,7 +379,7 @@ def work_job(current_user: User = Depends(require_permission("can_use_economy"))
 
     # Pay user
     job: Job = current_user.job.job
-    pay_amount: float = (random.randint(job.min_pay, job.max_pay)) / current_user.job.currency.value_multiplier
+    pay_amount: float = (random.uniform(job.min_pay, job.max_pay)) / current_user.job.currency.value_multiplier
     balance = session.exec(select(UserCurrency).where(UserCurrency.user_id == current_user.id, UserCurrency.currency_id == current_user.job.currency_id)).first()
     balance.balance = balance.balance + pay_amount
     session.add(balance)

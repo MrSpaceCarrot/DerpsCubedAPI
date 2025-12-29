@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # Dockerlink Settings
     DOCKERLINK_URL: str
     DOCKERLINK_AUTH_KEY: str
+    DOCKERLINK_ACTIVATED: bool
 
     # Discord Oauth Settings
     DISCORD_CLIENT_ID: str
