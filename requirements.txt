@@ -6,6 +6,8 @@
 #
 alembic==1.17.0
     # via -r requirements.in
+annotated-doc==0.0.4
+    # via fastapi
 annotated-types==0.7.0
     # via
     #   -r requirements.in
@@ -100,7 +102,7 @@ executing==2.2.1
     # via
     #   -r requirements.in
     #   stack-data
-fastapi==0.119.1
+fastapi==0.124.0
     # via
     #   -r requirements.in
     #   fastapi-filter
