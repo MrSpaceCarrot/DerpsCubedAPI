@@ -119,7 +119,7 @@ def add_game(game: GameCreate, current_user: User =  Depends(require_permission(
     session.flush()
 
     # Set banner image
-    banner_image_file_name = f"banner_images/{db_game.id}.png"
+    banner_image_file_name = f"banner_images/{str(db_game.id).zfill(4)}.png"
     db_game.banner_image = banner_image_file_name
     banner_image = generate_banner_image(db_game.banner_link)
     upload_file_to_bucket(banner_image, banner_image_file_name)

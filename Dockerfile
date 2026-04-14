@@ -1,20 +1,30 @@
-FROM python:3.11-alpine
+# Build
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
-RUN addgroup -S apigroup && adduser -S apiuser -G apigroup
+RUN pip install --no-cache-dir uv
 
-COPY ./requirements.txt /app/requirements.txt
+ENV UV_SYSTEM_PYTHON=1
 
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+COPY pyproject.toml uv.lock ./
 
-COPY ./ /app
+RUN uv sync --frozen --no-dev
 
-RUN mkdir -p /app/logs && \
-    chown -R apiuser:apigroup /app/logs
+# Runtime
+FROM python:3.14-slim
 
-RUN chown -R apiuser:apigroup /app
+WORKDIR /app
+
+COPY --from=builder /usr/local/lib/python3.14 /usr/local/lib/python3.14
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+COPY . .
+
+RUN addgroup --system apigroup && adduser --system --ingroup apigroup apiuser && \
+    mkdir -p /app/logs && \
+    chown -R apiuser:apigroup /app
 
 USER apiuser
 
-CMD ["uvicorn", "main:app", "--proxy-headers", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]

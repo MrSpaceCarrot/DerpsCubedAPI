@@ -28,11 +28,14 @@ def get_banner_link(link: str, platform: str) -> str | None:
             
             # Get banner link
             url: str = f"https://thumbnails.roblox.com/v1/games/multiget/thumbnails?universeIds={universe_id}&count=1&size=768x432&format=Png"
-            response = requests.get(url=url)
-
-            if response.status_code != 200:
+            try:
+                response = requests.get(url=url, timeout=5)
+                if response.status_code != 200:
+                    return None
+                return response.json()["data"][0]["thumbnails"][0]["imageUrl"]
+            
+            except requests.exceptions.Timeout:
                 return None
-            return response.json()["data"][0]["thumbnails"][0]["imageUrl"]
         
         case "Steam":
             # Get banner link
@@ -53,10 +56,13 @@ def update_banner_link(game_id: int) -> bool:
         new_banner_link = get_banner_link(db_game.link, db_game.platform)
 
         if new_banner_link == existing_banner_link or not db_game.update_banner_link:
-            logger.debug(f"Keeping banner image for {db_game.name}")
+            logger.debug(f"Keeping banner image for {db_game.name} at {existing_banner_link}")
+            return False
+        elif not new_banner_link:
+            logger.warning(f"Error updating banner image for {db_game.name}")
             return False
         else:
-            logger.debug(f"Updating banner image for {db_game.name}")
+            logger.debug(f"Updating banner image for {db_game.name} from {existing_banner_link} to {new_banner_link}")
             db_game.banner_link = new_banner_link
             session.add(db_game)
             session.commit()
@@ -89,14 +95,17 @@ def get_last_updated(link: str, platform: str) -> str | None:
             
             # Get last updated
             url: str = f"https://games.roblox.com/v1/games?universeIds={universe_id}"
-            response = requests.get(url=url)
-
-            if response.status_code != 200:
-                return None
             try:
-                updated = (response.json()["data"][0]["updated"])[:-1]
-                return datetime.fromisoformat(updated).replace(microsecond=0)
-            except Exception:
+                response = requests.get(url=url, timeout=5)
+                if response.status_code != 200:
+                    return None
+                try:
+                    updated = (response.json()["data"][0]["updated"])[:-1]
+                    return datetime.fromisoformat(updated).replace(microsecond=0)
+                except Exception:
+                    return None
+                
+            except requests.exceptions.Timeout:
                 return None
         
         case _:
@@ -113,6 +122,9 @@ def update_last_updated(game_id: int) -> bool:
 
         if new_last_updated == existing_last_updated:
             logger.debug(f"Keeping last updated for {db_game.name} at {existing_last_updated}")
+            return False
+        elif not new_last_updated:
+            logger.warning(f"Error updating last updated for {db_game.name}")
             return False
         else:
             logger.debug(f"Updating last updated for {db_game.name} from {existing_last_updated} to {new_last_updated}")
@@ -141,7 +153,7 @@ def update_last_updated_all() -> None:
 def generate_banner_image(banner_link: str) -> BytesIO | None:
     try:
         # Get image from image link
-        response: requests.Response = requests.get(banner_link)
+        response: requests.Response = requests.get(banner_link, timeout=5)
         img: Image = Image.open(BytesIO(response.content))
 
         # Resize and crop image
@@ -172,10 +184,16 @@ def update_banner_image(game_id: int) -> None:
 
         banner_image = generate_banner_image(db_game.banner_link)
         if banner_image:
+            file_name: str = f"banner_images/{str(db_game.id).zfill(4)}.png"
             logger.debug(f"Updating banner image for {db_game.name}")
-            upload_file_to_bucket(banner_image, db_game.banner_image)
+            upload_file_to_bucket(banner_image, file_name)
+
+            db_game.banner_image = file_name
+            session.add(db_game)
+            session.commit()
+
         else:
-            logger.error(f"Error updating banner image for {db_game.name}")
+            logger.warning(f"Error updating banner image for {db_game.name}")
 
 # Update banner image for all games
 def update_banner_images() -> None:
@@ -285,11 +303,14 @@ def get_roblox_universe_id(link: str) -> str | None:
 
     # Get universe id
     url: str = f"https://apis.roblox.com/universes/v1/places/{place_id}/universe"
-    response = requests.get(url=url)
-
-    if response.status_code != 200:
+    try:
+        response = requests.get(url=url, timeout=5)
+        if response.status_code != 200:
+            return None
+        return response.json()["universeId"]
+    
+    except requests.exceptions.Timeout:
         return None
-    return response.json()["universeId"]
 
 # Games maintanence tasks that run hourly
 def three_hourly_maintanence() -> None:
