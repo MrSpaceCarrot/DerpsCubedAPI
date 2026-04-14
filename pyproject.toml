@@ -1,6 +1,6 @@
 [project]
 name = "derpscubedapi"
-version = "0.0.3"
+version = "0.0.4"
 description = "An API for various services"
 readme = "README.md"
 requires-python = ">=3.14"
@@ -24,7 +24,7 @@ dependencies = [
     "deprecated",
     "dnspython",
     "email-validator",
-    "fastapi",
+    "fastapi>=0.100",
     "fastapi-filter",
     "fastapi-pagination",
     "greenlet",
@@ -46,9 +46,8 @@ dependencies = [
     "numpy",
     "pillow",
     "pycparser",
-    "pydantic-core",
-    "pydantic-settings",
-    "pydantic[email]",
+    "pydantic-core>=2.7",
+    "pydantic-settings>=2.3",
     "pyjwt",
     "pymongo",
     "python-dateutil",
@@ -66,7 +65,7 @@ dependencies = [
     "sqlmodel",
     "starlette",
     "toml",
-    "typing-extensions",
+    "typing-extensions>=4.8",
     "typing-inspection",
     "tzdata",
     "tzlocal",
