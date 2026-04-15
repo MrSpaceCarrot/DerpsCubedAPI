@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     APP_RELOAD: bool
     APP_ORIGINS: list
     APP_RUN_SCHEDULED_TASKS: bool
+    APP_IN_PRODUCTION: bool
 
     # Logging Settings
     LOG_LEVEL_WATCHFILES: str
@@ -90,6 +91,11 @@ class ColorFormatter(logging.Formatter):
         return super().format(record)
 
 # Log config
+if settings.APP_IN_PRODUCTION == True:
+    console_log_level = 'DEBUG'
+else:
+    console_log_level = 'INFO'
+
 log_config = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -108,7 +114,7 @@ log_config = {
     },
     'handlers': {
         'console': {
-            'level': 'INFO',
+            'level': console_log_level,
             'class': 'logging.StreamHandler',
             'formatter': 'color',
         },

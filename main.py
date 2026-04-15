@@ -41,11 +41,21 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown
 
 # Create app
-app = FastAPI(title=settings.APP_TITLE, 
-              summary=settings.APP_SUMMARY,
-              version=settings.APP_VERSION,
-              lifespan=lifespan,
-              redirect_slashes=False)
+if settings.APP_IN_PRODUCTION == True:
+    app = FastAPI(title=settings.APP_TITLE, 
+                summary=settings.APP_SUMMARY,
+                version=settings.APP_VERSION,
+                lifespan=lifespan,
+                redirect_slashes=False,
+                docs_url=None,
+                redoc_url=None,
+                openapi_url=None)
+else:
+    app = FastAPI(title=settings.APP_TITLE, 
+                summary=settings.APP_SUMMARY,
+                version=settings.APP_VERSION,
+                lifespan=lifespan,
+                redirect_slashes=False)
 add_pagination(app)
 
 # Add CORS middleware
