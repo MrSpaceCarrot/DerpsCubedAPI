@@ -46,7 +46,7 @@ dependencies = [
     "numpy",
     "pillow",
     "pycparser",
-    "pydantic-core>=2.7",
+    "pydantic-core>=2.46.1",
     "pydantic-settings>=2.3",
     "pyjwt",
     "pymongo",
