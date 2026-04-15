@@ -92,9 +92,9 @@ class ColorFormatter(logging.Formatter):
 
 # Log config
 if settings.APP_IN_PRODUCTION == True:
-    console_log_level = 'DEBUG'
-else:
     console_log_level = 'INFO'
+else:
+    console_log_level = 'DEBUG'
 
 log_config = {
     'version': 1,
