@@ -141,8 +141,10 @@ class GameFilter(Filter):
     platform: Optional[str] = None
     platform__in: Optional[list[str]] = None
     platform__not_in: Optional[list[str]] = None
+    min_party_size__lte: Optional[int] = None
     min_party_size__gte: Optional[int] = None
     max_party_size__lte: Optional[int] = None
+    max_party_size__gte: Optional[int] = None
     tags__in: Optional[list[str]] = None
     last_updated__isnull: Optional[bool] = None
     added_by_id: Optional[int] = None
