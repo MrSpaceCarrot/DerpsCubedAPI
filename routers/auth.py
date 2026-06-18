@@ -10,7 +10,8 @@ from auth.utilities import *
 from schemas.database import get_session
 from schemas.auth import Tokens, RefreshToken
 from schemas.users import User
-from services.users import get_or_create_user
+from services.users import get_or_create_user, generate_avatar_image
+from services.storage import *
 
 
 router = APIRouter()
@@ -66,6 +67,12 @@ def discord_callback(response: Response, code: str | None = None, redirect_url: 
     user.username = user_info["username"]
     user.avatar_link = f"https://cdn.discordapp.com/avatars/{user_info['id']}/{user_info['avatar']}?size=1024"
     user.last_site_login = datetime.now(timezone.utc)
+
+    avatar_image_file_name = f"avatar_images/{str(user.id).zfill(4)}.png"
+    user.avatar_image = avatar_image_file_name
+    avatar_image = generate_avatar_image(user.avatar_link)
+    upload_file_to_bucket(avatar_image, avatar_image_file_name)
+
     session.add(user)
 
     # Issue access and refresh token, save refresh token to database

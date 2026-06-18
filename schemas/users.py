@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Optional, List
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from fastapi_filter.contrib.sqlalchemy import Filter
+from pydantic import field_validator
+from config import settings
 
 if TYPE_CHECKING:
     from schemas.auth import ApiKey
@@ -35,6 +37,7 @@ class User(SQLModel, table=True):
     discord_id: str = Field(index=True, default=None, max_length=100)
     username: Optional[str] = Field(index=True, default=None, max_length=100)
     avatar_link: Optional[str] = Field(index=True, default=None, max_length=100)
+    avatar_image: Optional[str] = Field(index=True, default=None, max_length=100)
     first_site_login: Optional[datetime] = Field(index=True, default=None)
     last_site_login: Optional[datetime] = Field(index=True, default=None)
     display_name: Optional[str] = Field(index=True, default=None, max_length=100)
@@ -58,17 +61,33 @@ class UserPublic(SQLModel):
     discord_id: str
     username: Optional[str]
     avatar_link: Optional[str]
+    avatar_image: Optional[str]
     first_site_login: Optional[datetime]
     last_site_login: Optional[datetime]
     display_name: Optional[str]
     display_name_last_changed: Optional[datetime]
     can_use_site: Optional[bool]
 
+    @field_validator("avatar_image")
+    def validate_avatar_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
+
 
 class UserPublicShort(SQLModel):
     id: int
     discord_id: str
     username: str
+    avatar_link: str
+    avatar_image: str
+    display_name: str
+
+    @field_validator("avatar_image")
+    def validate_avatar_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
 
 
 class UserCreate(SQLModel):

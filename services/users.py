@@ -1,16 +1,21 @@
 # Module Imports
 import logging
 import requests
+import time
+from io import BytesIO
+from PIL import Image
 from sqlmodel import Session, select
 from config import settings
 from schemas.database import engine
 from schemas.users import User, Permission, UserPermission
 from services.economy import populate_user_currencies
+from services.storage import *
 
 
 logger = logging.getLogger("services")
 
 # Services
+# General
 # Get or create user
 def get_or_create_user(discord_id: str) -> User:
     with Session(engine) as session:
@@ -48,3 +53,50 @@ def set_all_default_user_permissions() -> None:
         db_users = session.exec(select(User)).all()
         for user in db_users:
             set_default_user_permissions(user)
+
+# Avatar Images
+# Generate an avatar image from an avatar link
+def generate_avatar_image(avatar_link: str) -> BytesIO | None:
+    try:
+        # Get image from link
+        response: requests.Response = requests.get(avatar_link, timeout=5)
+        img: Image = Image.open(BytesIO(response.content))
+
+        # Return contentfile
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        buffer.seek(0)
+        return buffer
+    except Exception:
+        return None
+    
+# Update a user's avatar image
+def update_avatar_image(user_id: int):
+    with Session(engine) as session:
+        db_user: User = session.get(User, user_id)
+
+        if not db_user.avatar_link:
+            logger.debug(f"Skipping updating avatar image for {db_user.username}")
+            return
+
+        avatar_image = generate_avatar_image(db_user.avatar_link)
+        if avatar_image:
+            file_name: str = f"avatar_images/{str(db_user.id).zfill(4)}.png"
+            logger.debug(f"Updating avatar image for {db_user.username}")
+            upload_file_to_bucket(avatar_image, file_name)
+
+            db_user.avatar_image = file_name
+            session.add(db_user)
+            session.commit()
+
+        else:
+            logger.warning(f"Error updating avatar image for {db_user.username}")
+
+# Update all user avatar images
+def update_avatar_images() -> None:
+    with Session(engine) as session:
+        db_users = session.exec(select(User).order_by(User.id.asc())).all()
+        for db_user in db_users:
+            time.sleep(1)
+            update_avatar_image(db_user.id)
+        logger.info(f"Updated banner image for {len(db_users)} games")
