@@ -1,10 +1,12 @@
 # Module Imports
 import logging
+from typing import TypeVar
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from fastapi_filter import FilterDepends
-from fastapi_pagination import Page
+from fastapi_pagination import Page, Params
 from fastapi_pagination.ext.sqlalchemy import paginate
+from fastapi_pagination.customization import CustomizedPage, UseParamsFields
 from sqlmodel import Session, select
 from sqlalchemy import func
 from auth.security import require_permission
@@ -17,6 +19,13 @@ from services.storage import *
 
 router = APIRouter()
 logger = logging.getLogger("services")
+
+# Increase max size for certain requests
+T = TypeVar("T")
+LargePage = CustomizedPage[
+    Page[T],
+    UseParamsFields(size=Query(50, ge=1, le=1000),)
+]
 
 # Get games
 @router.get("", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
@@ -49,9 +58,9 @@ def get_game_ratings(filter: GameRatingFilter = FilterDepends(GameRatingFilter),
     query = filter.sort(query)
     return paginate(session, query)
 
-# Get current user's ratings
-@router.get("/ratings/me", tags=["games"])
-def get_current_user_game_ratings(filter: GameRatingFilter = FilterDepends(GameRatingFilter), current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)) -> Page[GameRating]:
+# Get a user's ratings
+@router.get("/ratings/user", tags=["games"])
+def get_user_game_ratings(filter: GameRatingFilter = FilterDepends(GameRatingFilter), current_user: User =  Depends(require_permission("can_view_games")), session: Session = Depends(get_session)) -> LargePage[GameRatingPublic]:
     query = select(GameRating)
     query = filter.filter(query)
     query = filter.sort(query)

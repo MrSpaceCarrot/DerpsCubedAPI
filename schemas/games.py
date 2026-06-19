@@ -117,6 +117,18 @@ class GamePublic(SQLModel):
         if value and not value.startswith("http"):
             return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
         return value
+        
+
+class GamePublicSimple(SQLModel):
+    id: int
+    name: str
+    banner_image: Optional[str]
+
+    @field_validator("banner_image")
+    def validate_banner_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
 
 
 class GameCreate(GameBase):
@@ -204,7 +216,7 @@ class GameRating(SQLModel, table=True):
 
 class GameRatingPublic(SQLModel):
     id: int
-    game_id: int
+    game: GamePublicSimple
     user_id: int
     rating: int
     last_updated: datetime
@@ -225,6 +237,8 @@ class GameRatingFilter(Filter):
     game_id: Optional[int] = None
     user_id: Optional[int] = None
     rating: Optional[int] = None
+    rating__lte: Optional[int] = None
+    rating__gte: Optional[int] = None
     order_by: Optional[list[str]] = ["id"]
 
     class Constants(Filter.Constants):
