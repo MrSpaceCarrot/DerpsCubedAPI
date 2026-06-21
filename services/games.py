@@ -10,6 +10,7 @@ from fastapi import HTTPException, status
 from sqlmodel import Session, select
 from schemas.database import engine
 from schemas.games import Game, GameRating, GameTag
+from schemas.users import User
 from services.storage import *
 
 
@@ -203,6 +204,45 @@ def update_banner_images() -> None:
             time.sleep(1)
             update_banner_image(db_game.id)
         logger.info(f"Updated banner image for {len(db_games)} games")
+
+# Ratings
+# Fill in ratings for each user for a game if they do not exist
+def populate_game_ratings(game_id: int):
+    with Session(engine) as session:
+        db_game = session.get(Game, game_id)
+        db_users = session.exec(select(User)).all()
+        for db_user in db_users:
+            for db_rating in db_game.ratings:
+                if db_rating.user == db_user:
+                    break
+            else:
+                new_rating = GameRating(game_id=db_game.id, user_id=db_user.id, rating=0)
+                session.add(new_rating)
+        session.commit()
+        logger.info(f"Populated ratings for {db_game.name}")
+
+# Fill in all ratings for one user only
+def populate_user_ratings(user_id: int):
+    with Session(engine) as session:
+        db_user = session.get(User, user_id)
+        db_games = session.exec(select(Game).order_by(Game.id.asc())).all()
+        for db_game in db_games:
+            for db_rating in db_game.ratings:
+                if db_rating.user == db_user:
+                    break
+            else:
+                new_rating = GameRating(game_id=db_game.id, user_id=db_user.id, rating=0)
+                session.add(new_rating)
+        session.commit()
+        logger.info(f"Populated ratings for {db_user.username}")
+
+# Fill in ratings for all games
+def populate_all_ratings():
+    with Session(engine) as session:
+        db_games = session.exec(select(Game).order_by(Game.id.asc())).all()
+        for db_game in db_games:
+            populate_game_ratings(db_game.id)
+        logger.info(f"Populated ratings for {len(db_games)} games")
 
 # Average Rating
 # Calculate the average rating for a game

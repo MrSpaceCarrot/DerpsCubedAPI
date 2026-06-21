@@ -136,6 +136,9 @@ def add_game(game: GameCreate, current_user: User =  Depends(require_permission(
     # Commit game to db and return
     session.commit()
     session.refresh(db_game)
+
+    # Populate ratings for the game
+    populate_game_ratings(db_game.id)
     return db_game
 
 # Get game

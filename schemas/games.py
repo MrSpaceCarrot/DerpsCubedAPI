@@ -211,7 +211,7 @@ class GameRating(SQLModel, table=True):
     user: "User" = Relationship(back_populates="ratings")
 
     rating: int = Field(..., index=True)
-    last_updated: datetime = Field(index=True, default=None)
+    last_updated: Optional[datetime] = Field(index=True, default=None)
 
 
 class GameRatingPublic(SQLModel):
@@ -219,7 +219,7 @@ class GameRatingPublic(SQLModel):
     game: GamePublicSimple
     user_id: int
     rating: int
-    last_updated: datetime
+    last_updated: Optional[datetime]
 
 
 class GameRatingUpdate(SQLModel):

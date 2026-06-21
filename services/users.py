@@ -9,6 +9,7 @@ from config import settings
 from schemas.database import engine
 from schemas.users import User, Permission, UserPermission
 from services.economy import populate_user_currencies
+from services.games import populate_user_ratings
 from services.storage import *
 
 
@@ -36,6 +37,7 @@ def get_or_create_user(discord_id: str) -> User:
             session.refresh(db_user)
             populate_user_currencies(db_user)
             set_default_user_permissions(db_user)
+            populate_user_ratings(db_user.id)
         return db_user
 
 # Set default permissions for a user
