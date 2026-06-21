@@ -4,12 +4,12 @@ import logging
 import validators
 from typing import TYPE_CHECKING, Optional, List
 from typing_extensions import Self
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field, Relationship
 from fastapi_filter.contrib.sqlalchemy import Filter
 import sqlalchemy as sa
 from sqlalchemy import or_, func
-from pydantic import field_validator, model_validator
+from pydantic import field_validator, model_validator, field_serializer
 from config import settings
 
 
@@ -91,7 +91,7 @@ class Game(GameBase, table=True):
     average_rating: Optional[float] = Field(index=True, default=None)
     popularity_score: Optional[float] = Field(index=True, default=None)
 
-    ratings: Optional[list["GameRating"]] = Relationship(back_populates="game")
+    ratings: Optional[list["GameRating"]] = Relationship(back_populates="game", cascade_delete=True)
 
 
 class GamePublic(SQLModel):
@@ -117,6 +117,20 @@ class GamePublic(SQLModel):
         if value and not value.startswith("http"):
             return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
         return value
+    
+    @field_serializer("last_updated")
+    def validate_last_updated(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+    
+    @field_serializer("date_added")
+    def validate_date_added(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
         
 
 class GamePublicSimple(SQLModel):
@@ -220,6 +234,13 @@ class GameRatingPublic(SQLModel):
     user_id: int
     rating: int
     last_updated: Optional[datetime]
+
+    @field_serializer("last_updated")
+    def validate_last_updated(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
 
 
 class GameRatingUpdate(SQLModel):

@@ -1,13 +1,13 @@
 # Module Imports
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional, List, Literal
 from sqlmodel import SQLModel, Float, Field, Relationship
 from fastapi_filter.contrib.sqlalchemy import Filter
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.ext.mutable import MutableList
-from pydantic import field_validator
+from pydantic import field_validator, field_serializer
 from schemas.users import UserPublicShort
 
 
@@ -141,6 +141,13 @@ class TransactionPublic(SQLModel):
     timestamp: datetime
     note: str
 
+    @field_serializer("timestamp")
+    def validate_timestamp(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
 
 class TransactionFilter(Filter):
     user_id: Optional[int] = None
@@ -226,6 +233,13 @@ class Cooldown(SQLModel, table=True):
 
     expires: datetime= Field(sa_column=sa.Column(sa.DateTime(timezone=True), nullable=False))
     cooldown_type: str = Field(index=True, max_length=30)
+
+    @field_serializer("expires")
+    def validate_expires(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
 
 
 # Currency Exchange

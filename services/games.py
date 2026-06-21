@@ -3,6 +3,7 @@ import re
 import time
 import logging
 import requests
+import copy
 from io import BytesIO
 from PIL import Image
 from datetime import datetime
@@ -292,21 +293,23 @@ def update_average_ratings() -> None:
 # Popularity Score
 # Calculate the popularity score for a game
 def calculate_popularity_score(ratings: list[GameRating]) -> float | None:
+    non_zero_ratings = copy.deepcopy(ratings)
     for rating in ratings:
-        if rating in [0, -1]:
-            ratings.remove(rating)
-    average_rating = calculate_average_rating(ratings)
+        if rating.rating in [0, -1]:
+            non_zero_ratings.remove(rating)
+    
+    average_rating = calculate_average_rating(non_zero_ratings)
     if not average_rating:
         return None
     people_constant = settings.MISC_PEOPLE_CONSTANT
-    return round(min(1, (average_rating) * 0.12 * (len(ratings) / people_constant)), 4)
+    return round(min(1, (average_rating) * 0.12 * (len(non_zero_ratings) / people_constant)), 4)
 
 # Update the popularity score for a game
 def update_popularity_score(game_id: int) -> bool:
     with Session(engine) as session:
         db_game = session.get(Game, game_id)
         existing_popularity_score = db_game.popularity_score
-        new_popularity_score = calculate_popularity_score(db_game.ratings)
+        new_popularity_score = calculate_popularity_score(copy.deepcopy(db_game.ratings))
         
         if new_popularity_score == existing_popularity_score:
             logger.debug(f"Keeping popularity score for {db_game.name} at {existing_popularity_score}")
