@@ -1,6 +1,7 @@
 # Module Imports
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Optional
+from pydantic import field_serializer
 from sqlmodel import SQLModel, Field, Relationship
 from schemas.users import UserPublic
 
@@ -27,10 +28,32 @@ class RefreshToken(SQLModel, table=True):
     issued_at: datetime = Field(index=True)
     expires_at: datetime = Field(index=True)
 
+    @field_serializer("issued_at")
+    def validate_issued_at(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        
+    @field_serializer("expires_at")
+    def validate_expires_at(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
 
 class Tokens(SQLModel):
     access_token: str
     token_type: str
+    expires: datetime
     expires_in: int
     refresh_token: str
     user: UserPublic
+
+    @field_serializer("expires")
+    def validate_expires(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)

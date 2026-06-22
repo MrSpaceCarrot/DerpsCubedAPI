@@ -77,14 +77,20 @@ def discord_callback(response: Response, code: str | None = None, redirect_url: 
 
     # Issue access and refresh token, save refresh token to database
     issued_at = datetime.now(timezone.utc)
+
+    access_token_expires = issued_at + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
     access_token = create_jwt_token(user_id=user.id, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+
+    refresh_token_expires = issued_at + timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS)
     refresh_token = create_jwt_token(user_id=user.id, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
-    db_refresh_token = RefreshToken(subject=user.id, issued_at=issued_at, expires_at=issued_at + timedelta(minutes=settings.JWT_REFRESH_TOKEN_EXPIRY_MINS))
+    db_refresh_token = RefreshToken(subject=user.id, issued_at=issued_at, expires_at=refresh_token_expires)
+    
     session.commit()
     session.add(db_refresh_token)
+    session.commit()
 
     # Create return model
-    tokens = Tokens(access_token=access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=user)
+    tokens = Tokens(access_token=access_token, token_type="bearer", expires=access_token_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=user)
 
     # Set HTTP only cookies for both tokens
     response.set_cookie(
@@ -114,7 +120,6 @@ def refresh_access_token(response: Response,
                          refresh_cookie: Optional[str] = Cookie(default=None, alias="refresh_token"), 
                          session: Session = Depends(get_session)):
     # Ensure request has a refresh token, check either cookie or auth header
-    logger.critical(authorization)
     if refresh_cookie:
         refresh_token = refresh_cookie
     elif authorization:
@@ -142,7 +147,8 @@ def refresh_access_token(response: Response,
 
     # Prepare response
     db_user = session.get(User, user_id)
-    tokens = Tokens(access_token=new_access_token, token_type="bearer", expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user)
+    new_expires = issued_at = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
+    tokens = Tokens(access_token=new_access_token, token_type="bearer", expires=new_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user)
 
     # Set cookie and return
     response.set_cookie(

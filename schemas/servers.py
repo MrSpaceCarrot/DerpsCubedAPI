@@ -1,8 +1,9 @@
 # Module Imports
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlalchemy as sa
 from typing import Optional, Literal
 from sqlmodel import SQLModel, Field, Relationship
+from pydantic import field_serializer
 from fastapi_filter.contrib.sqlalchemy import Filter
 
 
@@ -60,6 +61,13 @@ class ServerPublic(SQLModel):
     is_running: bool
     time_started: Optional[datetime]
 
+    @field_serializer("time_started")
+    def validate_time_started(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+
 
 class ServerPublicSingle(SQLModel):
     id: int
@@ -81,6 +89,13 @@ class ServerPublicSingle(SQLModel):
     domain: str
     is_running: bool
     time_started: Optional[datetime]
+
+    @field_serializer("time_started")
+    def validate_time_started(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
 
 
 class ServerCreate(ServerBase):
