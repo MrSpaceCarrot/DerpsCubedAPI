@@ -43,7 +43,7 @@ def get_random_games(session: Session = Depends(get_session)) -> Page[GamePublic
     return paginate(session, query)
 
 # Get game tags
-@router.get("/tags", tags=["games"], dependencies=[Depends(require_permission("can_view_games"))])
+@router.get("/tags", tags=["games"])
 def get_game_tags(filter: GameTagFilter = FilterDepends(GameTagFilter), session: Session = Depends(get_session)) -> Page[GameTag]:
     query = select(GameTag)
     query = filter.filter(query)

@@ -56,6 +56,11 @@ def set_all_default_user_permissions() -> None:
         for user in db_users:
             set_default_user_permissions(user)
 
+# Format a user's permissions as a list of strings
+def format_user_permissions(user: User) -> None:
+    with Session(engine) as session:
+        return {permission.code for permission in user.permissions}
+
 # Avatar Images
 # Generate an avatar image from an avatar link
 def generate_avatar_image(avatar_link: str) -> BytesIO | None:

@@ -50,6 +50,7 @@ class Tokens(SQLModel):
     expires_in: int
     refresh_token: str
     user: UserPublic
+    user_permissions: list[str]
 
     @field_serializer("expires")
     def validate_expires(self, dt: datetime):

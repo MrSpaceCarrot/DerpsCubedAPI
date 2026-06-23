@@ -10,7 +10,7 @@ from auth.utilities import *
 from schemas.database import get_session
 from schemas.auth import Tokens, RefreshToken
 from schemas.users import User
-from services.users import get_or_create_user, generate_avatar_image
+from services.users import get_or_create_user, generate_avatar_image, format_user_permissions
 from services.storage import *
 
 
@@ -90,7 +90,7 @@ def discord_callback(response: Response, code: str | None = None, redirect_url: 
     session.commit()
 
     # Create return model
-    tokens = Tokens(access_token=access_token, token_type="bearer", expires=access_token_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=user)
+    tokens = Tokens(access_token=access_token, token_type="bearer", expires=access_token_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=user, user_permissions=format_user_permissions(user))
 
     # Set HTTP only cookies for both tokens
     response.set_cookie(
@@ -148,7 +148,7 @@ def refresh_access_token(response: Response,
     # Prepare response
     db_user = session.get(User, user_id)
     new_expires = issued_at = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
-    tokens = Tokens(access_token=new_access_token, token_type="bearer", expires=new_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user)
+    tokens = Tokens(access_token=new_access_token, token_type="bearer", expires=new_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user, user_permissions=format_user_permissions(db_user))
 
     # Set cookie and return
     response.set_cookie(

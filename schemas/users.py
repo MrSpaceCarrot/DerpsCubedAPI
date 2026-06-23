@@ -1,9 +1,9 @@
 # Module Imports
 from typing import TYPE_CHECKING, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import SQLModel, Field, Relationship
 from fastapi_filter.contrib.sqlalchemy import Filter
-from pydantic import field_validator
+from pydantic import field_validator, field_serializer
 from config import settings
 
 if TYPE_CHECKING:
@@ -73,6 +73,27 @@ class UserPublic(SQLModel):
         if value and not value.startswith("http"):
             return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
         return value
+
+    @field_serializer("first_site_login")
+    def validate_first_site_login(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        
+    @field_serializer("last_site_login")
+    def validate_last_site_login(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        
+    @field_serializer("display_name_last_changed")
+    def validate_display_name_last_changed(self, dt: datetime):
+        if dt:
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
 
 
 class UserPublicShort(SQLModel):
