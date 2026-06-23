@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from sqlmodel import Session, select
 from config import settings
 from auth.utilities import *
+from auth.security import Authenticator
 from schemas.database import get_session
 from schemas.auth import Tokens, RefreshToken
 from schemas.users import User
@@ -76,7 +77,7 @@ def discord_callback(response: Response, code: str | None = None, redirect_url: 
     session.add(user)
 
     # Issue access and refresh token, save refresh token to database
-    issued_at = datetime.now(timezone.utc)
+    issued_at = datetime.now(timezone.utc).replace(microsecond=0)
 
     access_token_expires = issued_at + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
     access_token = create_jwt_token(user_id=user.id, issued_at=issued_at, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
@@ -127,27 +128,20 @@ def refresh_access_token(response: Response,
     else:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
 
-    # Decode token
+    # Get token from db
     payload = decode_jwt_token(refresh_token)
-    user_id = payload.get("sub")
-    issued_at = datetime.fromtimestamp(payload.get("iat"), tz=timezone.utc)
-    expires_at = datetime.fromtimestamp(payload.get("exp"), tz=timezone.utc)
-
-    # Search for token in database
-    db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == user_id, 
-                                                               RefreshToken.issued_at == issued_at,
-                                                               RefreshToken.expires_at == expires_at)).first()
-    
-    # Give error if no token was found
+    db_refresh_token = get_db_refresh_token(payload)
     if not db_refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    db_refresh_token = session.merge(db_refresh_token)
 
     # Generate new token
-    new_access_token = create_jwt_token(user_id=payload.get("sub"), issued_at=datetime.now(timezone.utc), expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    new_expires = now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
+    new_access_token = create_jwt_token(user_id=payload.get("sub"), issued_at=now, expires_delta=timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS))
 
     # Prepare response
-    db_user = session.get(User, user_id)
-    new_expires = issued_at = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS)
+    db_user = session.get(User, payload.get("sub"))
     tokens = Tokens(access_token=new_access_token, token_type="bearer", expires=new_expires, expires_in=settings.JWT_ACCESS_TOKEN_EXPIRY_MINS * 60, refresh_token=refresh_token, user=db_user, user_permissions=format_user_permissions(db_user))
 
     # Set cookie and return
@@ -161,3 +155,84 @@ def refresh_access_token(response: Response,
     )
 
     return tokens
+
+# Logout by deleting a single refresh token
+@router.post("/logout", tags=["auth"], dependencies=[Depends(Authenticator())])
+def logout(response: Response,
+           authorization: Optional[str] = Header(None, convert_underscores=False),
+           refresh_cookie: Optional[str] = Cookie(default=None, alias="refresh_token"), 
+           session: Session = Depends(get_session)):
+    # Ensure request has a refresh token, check either cookie or auth header
+    if refresh_cookie:
+        refresh_token = refresh_cookie
+    elif authorization:
+        refresh_token = authorization.split(" ")[1]
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+    
+    # Get token from db
+    payload = decode_jwt_token(refresh_token)
+    db_refresh_token = get_db_refresh_token(payload)
+    if not db_refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    db_refresh_token = session.merge(db_refresh_token)
+
+    # Delete token
+    session.delete(db_refresh_token)
+    session.commit()
+
+    # Return empty cookies
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+    )
+    return
+
+# Logout everywhere by deleting all refresh tokens for a user
+@router.post("/logoutall", tags=["auth"], dependencies=[Depends(Authenticator())])
+def logout_all(response: Response,
+               authorization: Optional[str] = Header(None, convert_underscores=False),
+               refresh_cookie: Optional[str] = Cookie(default=None, alias="refresh_token"), 
+               session: Session = Depends(get_session)):
+    # Ensure request has a refresh token, check either cookie or auth header
+    if refresh_cookie:
+        refresh_token = refresh_cookie
+    elif authorization:
+        refresh_token = authorization.split(" ")[1]
+    else:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+    
+    # Get token from db
+    payload = decode_jwt_token(refresh_token)
+    db_refresh_token = get_db_refresh_token(payload)
+    if not db_refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+    db_refresh_token = session.merge(db_refresh_token)
+    
+    # Delete tokens
+    for token in db_refresh_token.user.refresh_tokens:
+        session.delete(token)
+    session.commit()
+    
+    # Return empty cookies
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,
+        samesite="Lax",
+    )
+    return

@@ -81,3 +81,24 @@ def clear_expired_refresh_tokens() -> None:
                 kept += 1
         session.commit()
         logger.info(f"Deleted {deleted} expired refresh tokens, kept {kept}")
+
+# Decode refresh token and check it against the db
+def get_db_refresh_token(refresh_token_payload: str) -> RefreshToken | None:
+    with Session(engine) as session:
+        # Get token data
+        user_id = refresh_token_payload.get("sub")
+        issued_at = datetime.fromtimestamp(refresh_token_payload.get("iat"), tz=timezone.utc)
+        expires_at = datetime.fromtimestamp(refresh_token_payload.get("exp"), tz=timezone.utc)
+
+        logger.critical([user_id, issued_at, expires_at])
+
+        # Search for token in database
+        db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == user_id, 
+                                                                RefreshToken.issued_at == issued_at,
+                                                                RefreshToken.expires_at == expires_at)).first()
+        
+        # Return token or none
+        if db_refresh_token:
+            return db_refresh_token
+        else:
+            return None
