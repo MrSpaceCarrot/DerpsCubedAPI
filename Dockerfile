@@ -18,6 +18,9 @@ COPY --from=builder /usr/local /usr/local
 
 COPY . .
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 RUN addgroup --system apigroup && \
     adduser --system --ingroup apigroup apiuser && \
     mkdir -p /app/logs && \
@@ -25,4 +28,4 @@ RUN addgroup --system apigroup && \
 
 USER apiuser
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["/entrypoint.sh"]

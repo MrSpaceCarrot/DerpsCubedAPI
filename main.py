@@ -27,7 +27,7 @@ scheduler = AsyncIOScheduler()
 # Startup logic
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    setup_database()
+    #setup_database()
     create_bucket()
     if settings.APP_RUN_SCHEDULED_TASKS == True:
         scheduler.start()

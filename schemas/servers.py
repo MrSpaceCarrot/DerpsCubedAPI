@@ -3,8 +3,9 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 from typing import Optional, Literal
 from sqlmodel import SQLModel, Field, Relationship
-from pydantic import field_serializer
+from pydantic import field_serializer, field_validator
 from fastapi_filter.contrib.sqlalchemy import Filter
+from config import settings
 
 
 # Schemas
@@ -26,6 +27,7 @@ class ServerBase(SQLModel):
     emoji: str = Field(index=True, max_length=45)
     uuid: str = Field(index=True, max_length=8)
     domain: str = Field(index=True, max_length=60)
+    banner_image: Optional[str] = Field(index=True, default=None, max_length=100)
 
 
 class Server(ServerBase, table=True):
@@ -60,6 +62,7 @@ class ServerPublic(SQLModel):
     domain: str
     is_running: bool
     time_started: Optional[datetime]
+    banner_image: str
 
     @field_serializer("time_started")
     def validate_time_started(self, dt: datetime):
@@ -67,6 +70,12 @@ class ServerPublic(SQLModel):
             if dt.tzinfo is None:
                 return dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc)
+        
+    @field_validator("banner_image")
+    def validate_banner_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
 
 
 class ServerPublicSingle(SQLModel):
@@ -89,6 +98,7 @@ class ServerPublicSingle(SQLModel):
     domain: str
     is_running: bool
     time_started: Optional[datetime]
+    banner_image: str
 
     @field_serializer("time_started")
     def validate_time_started(self, dt: datetime):
@@ -96,6 +106,12 @@ class ServerPublicSingle(SQLModel):
             if dt.tzinfo is None:
                 return dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc)
+        
+    @field_validator("banner_image")
+    def validate_banner_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
 
 
 class ServerCreate(ServerBase):

@@ -90,8 +90,6 @@ def get_db_refresh_token(refresh_token_payload: str) -> RefreshToken | None:
         issued_at = datetime.fromtimestamp(refresh_token_payload.get("iat"), tz=timezone.utc)
         expires_at = datetime.fromtimestamp(refresh_token_payload.get("exp"), tz=timezone.utc)
 
-        logger.critical([user_id, issued_at, expires_at])
-
         # Search for token in database
         db_refresh_token = session.exec(select(RefreshToken).where(RefreshToken.subject == user_id, 
                                                                 RefreshToken.issued_at == issued_at,

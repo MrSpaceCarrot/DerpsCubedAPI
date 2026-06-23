@@ -186,7 +186,7 @@ def update_banner_image(game_id: int) -> None:
 
         banner_image = generate_banner_image(db_game.banner_link)
         if banner_image:
-            file_name: str = f"banner_images/{str(db_game.id).zfill(4)}.png"
+            file_name: str = f"game_banner_images/{str(db_game.id).zfill(4)}.png"
             logger.debug(f"Updating banner image for {db_game.name}")
             upload_file_to_bucket(banner_image, file_name)
 
