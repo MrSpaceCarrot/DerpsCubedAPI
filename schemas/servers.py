@@ -62,7 +62,7 @@ class ServerPublic(SQLModel):
     domain: str
     is_running: bool
     time_started: Optional[datetime]
-    banner_image: str
+    banner_image: Optional[str]
 
     @field_serializer("time_started")
     def validate_time_started(self, dt: datetime):
@@ -98,7 +98,7 @@ class ServerPublicSingle(SQLModel):
     domain: str
     is_running: bool
     time_started: Optional[datetime]
-    banner_image: str
+    banner_image: Optional[str]
 
     @field_serializer("time_started")
     def validate_time_started(self, dt: datetime):
