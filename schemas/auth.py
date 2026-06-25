@@ -25,7 +25,7 @@ class RefreshToken(SQLModel, table=True):
     __tablename__ = "refresh_tokens"
     id: Optional[int] = Field(primary_key=True, index=True)
 
-    subject: int = Field(foreign_key="users.id")
+    subject: int = Field(foreign_key="users.id", index=True)
     user: "User" = Relationship(back_populates="refresh_tokens")
 
     issued_at: datetime = Field(index=True)

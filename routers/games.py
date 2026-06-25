@@ -131,7 +131,10 @@ def add_game(game: GameCreate, current_user: User =  Depends(require_permission(
     banner_image_file_name = f"game_banner_images/{str(db_game.id).zfill(4)}.png"
     db_game.banner_image = banner_image_file_name
     banner_image = generate_banner_image(db_game.banner_link)
-    upload_file_to_bucket(banner_image, banner_image_file_name)
+    try:
+        upload_file_to_bucket(banner_image, banner_image_file_name)
+    except Exception:
+        pass
 
     # Commit game to db and return
     session.commit()

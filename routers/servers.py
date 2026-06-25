@@ -7,6 +7,7 @@ from fastapi_filter import FilterDepends
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import paginate
 from sqlmodel import Session, select
+from sqlalchemy.orm import selectinload
 from auth.security import require_permission
 from config import settings
 from schemas.database import get_session
@@ -19,7 +20,7 @@ logger = logging.getLogger("services")
 # Get servers
 @router.get("", tags=["servers"], dependencies=[Depends(require_permission("can_view_servers"))])
 def get_servers(filter: ServerFilter = FilterDepends(ServerFilter), session: Session = Depends(get_session)) -> Page[ServerPublic]:
-    query = select(Server)
+    query = select(Server).join(Game).join(ServerCategory)
     query = filter.filter(query)
     query = filter.sort(query)
     return paginate(session, query)
@@ -39,11 +40,11 @@ def add_server_category(category: ServerCategoryCreate, session: Session = Depen
     db_category = ServerCategory(**category.model_dump())
 
     # Ensure that icon and color are set if minecraft
-    if db_category.is_minecraft and (not db_category.icon or not db_category.color):
-        raise HTTPException(status_code=400, detail="An icon and color must be provided for minecraft categories")
+    if db_category.is_minecraft and (not db_category.icon or not db_category.minecraft_color):
+        raise HTTPException(status_code=400, detail="An icon and minecraft_color must be provided for minecraft categories")
     else:
         db_category.icon = None
-        db_category.color = None
+        db_category.minecraft_color = None
 
     # Commit category
     session.add(db_category)
@@ -77,7 +78,7 @@ def edit_server_category(id: int, category: ServerCategoryUpdate, session: Sessi
         raise HTTPException(status_code=400, detail="An icon and color must be provided for minecraft categories")
     else:
         db_category.icon = None
-        db_category.color = None
+        db_category.minecraft_color = None
 
     # Commit category to db and return
     session.add(db_category)
@@ -129,20 +130,17 @@ def add_server(server: ServerCreate, session: Session = Depends(get_session)):
     return db_server
 
 # Get server
-@router.get("/{id}", tags=["servers"], response_model=ServerPublicSingle, dependencies=[Depends(require_permission("can_view_servers"))])
+@router.get("/{id}", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_view_servers"))])
 def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> Server:
     # Check that the server exists
     db_server = session.get(Server, id)
     if not db_server:
-        db_server = session.exec(select(Server).where(Server.name == id)).first()
+        db_server = session.exec(select(Server).where(Server.name == id).options(selectinload(Server.game)).options(selectinload(Server.category))).first()
         if not db_server:
             raise HTTPException(status_code=404, detail="Server not found")
-        
-    # Add is_running information to response
-    server_response: ServerPublicSingle = ServerPublicSingle(**db_server.model_dump())
 
     # Return
-    return server_response
+    return db_server
 
 # Edit server
 @router.patch("/{id}", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_manage_servers"))], status_code=200)

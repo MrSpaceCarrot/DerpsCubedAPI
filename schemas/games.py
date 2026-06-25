@@ -15,6 +15,7 @@ from config import settings
 
 if TYPE_CHECKING:
     from schemas.users import User
+    from schemas.servers import Server
 
 logger = logging.getLogger("services")
 
@@ -93,6 +94,10 @@ class Game(GameBase, table=True):
 
     ratings: Optional[list["GameRating"]] = Relationship(back_populates="game", cascade_delete=True)
 
+    servers_color: Optional[str] = Field(index=True, default=None, max_length=30)
+    servers_image: Optional[str] = Field(index=True, default=None, max_length=100)
+    servers: Optional[list["Server"]] = Relationship(back_populates="game")
+
 
 class GamePublic(SQLModel):
     id: int
@@ -111,6 +116,8 @@ class GamePublic(SQLModel):
     update_banner_link: bool
     average_rating: Optional[float]
     popularity_score: Optional[float]
+    servers_color: Optional[str]
+    servers_image: Optional[str]
 
     @field_validator("banner_image")
     def validate_banner_image(cls, value: str) -> str:
@@ -132,6 +139,12 @@ class GamePublic(SQLModel):
                 return dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc)
         
+    @field_validator("servers_image")
+    def validate_servers_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
+        
 
 class GamePublicSimple(SQLModel):
     id: int
@@ -140,6 +153,19 @@ class GamePublicSimple(SQLModel):
 
     @field_validator("banner_image")
     def validate_banner_image(cls, value: str) -> str:
+        if value and not value.startswith("http"):
+            return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
+        return value
+    
+
+class GamePublicForServers(SQLModel):
+    id: int
+    name: str
+    servers_color: Optional[str]
+    servers_image: Optional[str]
+
+    @field_validator("servers_image")
+    def validate_servers_image(cls, value: str) -> str:
         if value and not value.startswith("http"):
             return f"{settings.STORAGE_BUCKET_MEDIA_URL}/{settings.STORAGE_BUCKET_NAME}/{value}"
         return value
@@ -159,9 +185,12 @@ class GameUpdate(GameBase):
     max_party_size: Optional[int] = None
     tags: Optional[List[str]] = None
     update_banner_link: Optional[bool] = None
+    servers_color: Optional[str] = None
+    servers_image: Optional[str] = None
 
 
 class GameFilter(Filter):
+    id: Optional[int] = None
     name: Optional[str] = None
     name__like: Optional[str] = None
     platform: Optional[str] = None
@@ -177,6 +206,7 @@ class GameFilter(Filter):
     average_rating__gte: Optional[float] = None
     popularity_score__gte: Optional[float] = None
     order_by: Optional[list[str]] = ["id"]
+    servers_image__not_in: Optional[list[str]] = None
 
     class Constants(Filter.Constants):
         model = Game
