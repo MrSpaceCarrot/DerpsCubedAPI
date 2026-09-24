@@ -100,6 +100,11 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
     if db_server.is_running == True:
         raise HTTPException(status_code=400, detail=f"Server is already online")
 
+    # Check if max number of running servers is reached
+    db_running_servers = session.exec(select(Server).where(Server.is_running)).all()
+    if len(db_running_servers) == settings.MISC_MAX_RUNNING_SERVERS:
+        raise HTTPException(status_code=503, detail=f"The maximum number of simultaneously running servers has been reached")
+
     # Start server
     url: str = f"{settings.PTERODACTYL_DOMAIN}/api/client/servers/{db_server.uuid}/power"
     headers: dict = {'Authorization': f'Bearer {settings.PTERODACTYL_CLIENT_API_KEY}'}
@@ -108,6 +113,11 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
 
     # Send response
     if response.status_code == 204:
+        # Update server running status in db
+        db_server.is_running = True
+        session.add(db_server)
+        session.commit()
+        
         return f"Successfully starting server '{db_server.display_name}'"
     else:
         raise HTTPException(status_code=500, detail=f"An error occured starting server '{db_server.display_name}'")

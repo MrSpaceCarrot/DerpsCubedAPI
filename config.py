@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # Misc Settings
     MISC_PEOPLE_CONSTANT: int
+    MISC_MAX_RUNNING_SERVERS: int
 
     # Specify env file
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
