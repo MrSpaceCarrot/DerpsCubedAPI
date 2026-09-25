@@ -102,8 +102,9 @@ def start_server(id: Union[int, str], session: Session = Depends(get_session)):
 
     # Check if max number of running servers is reached
     db_running_servers = session.exec(select(Server).where(Server.is_running)).all()
-    if len(db_running_servers) == settings.MISC_MAX_RUNNING_SERVERS:
-        raise HTTPException(status_code=503, detail=f"The maximum number of simultaneously running servers has been reached")
+    print(len(db_running_servers))
+    if len(db_running_servers) >= settings.MISC_MAX_RUNNING_SERVERS:
+        raise HTTPException(status_code=503, detail=f"Too many servers running")
 
     # Start server
     url: str = f"{settings.PTERODACTYL_DOMAIN}/api/client/servers/{db_server.uuid}/power"
@@ -141,7 +142,7 @@ def add_server(server: ServerCreate, session: Session = Depends(get_session)):
 
 # Get server
 @router.get("/{id}", tags=["servers"], response_model=ServerPublic, dependencies=[Depends(require_permission("can_view_servers"))])
-def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> Server:
+def get_server(id: Union[int, str], session: Session = Depends(get_session)) -> ServerPublic:
     # Check that the server exists
     db_server = session.get(Server, id)
     if not db_server:
