@@ -101,8 +101,8 @@ class UserPublicShort(SQLModel):
     id: int
     discord_id: str
     username: str
-    avatar_link: str
-    avatar_image: str
+    avatar_link: Optional[str]
+    avatar_image: Optional[str]
     display_name: str
 
     @field_validator("avatar_image")
