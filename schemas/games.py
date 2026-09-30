@@ -2,6 +2,7 @@
 import json
 import logging
 import validators
+from collections import defaultdict
 from typing import TYPE_CHECKING, Optional, List
 from typing_extensions import Self
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from fastapi_filter.contrib.sqlalchemy import Filter
 import sqlalchemy as sa
 from sqlalchemy import or_, func
-from pydantic import field_validator, model_validator, field_serializer
+from pydantic import field_validator, model_validator, field_serializer, ValidationInfo
 from config import settings
 
 
@@ -211,6 +212,49 @@ class GameFilter(Filter):
     class Constants(Filter.Constants):
         model = Game
 
+    # Random BS that allows random ordering
+    @field_validator("*", mode="before", check_fields=False)
+    @classmethod
+    def validate_order_by(cls, value, field: ValidationInfo):
+        if field.field_name != cls.Constants.ordering_field_name:
+            return value
+
+        if not value:
+            return None
+
+        if "random" in value:
+            if value != ["random"]:
+                raise ValueError("random must be the only ordering field.")
+            return value
+
+        field_name_usages = defaultdict(list)
+        duplicated_field_names = set()
+
+        for field_name_with_direction in value:
+            field_name = field_name_with_direction.replace("-", "").replace("+", "")
+
+            if not hasattr(cls.Constants.model, field_name):
+                raise ValueError(f"{field_name} is not a valid ordering field.")
+
+            field_name_usages[field_name].append(field_name_with_direction)
+            if len(field_name_usages[field_name]) > 1:
+                duplicated_field_names.add(field_name)
+
+        if duplicated_field_names:
+            ambiguous_field_names = ", ".join(
+                [
+                    field_name_with_direction
+                    for field_name in sorted(duplicated_field_names)
+                    for field_name_with_direction in field_name_usages[field_name]
+                ]
+            )
+            raise ValueError(
+                f"Field names can appear at most once for {cls.Constants.ordering_field_name}. "
+                f"The following was ambiguous: {ambiguous_field_names}."
+            )
+
+        return value
+
     def filter(self, query):
         # Save tags so that they don't get written incorrectly to the query
         tags = self.tags__in
@@ -227,6 +271,11 @@ class GameFilter(Filter):
         # Return query
         self.tags__in = tags
         return query
+
+    def sort(self, query):
+        if self.order_by == ["random"]:
+            return query.order_by(func.rand())
+        return super().sort(query)
 
 
 # GameTag
